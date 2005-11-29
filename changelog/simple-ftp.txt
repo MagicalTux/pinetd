@@ -1,0 +1,15 @@
+Version 1.0 :
+ - Now rename/move operations are enabled
+ - Due to statcache, the RMD was always saying 'operation failed'
+ - Speed test : 3.91M/s (upto 5M/s) with ftp transfert (same as direct file copy)
+   Seems that my VMWare compressed hard disk is a bit slow ;)
+ - SIZE function now implemented
+ - Quota displayed after PASS <>
+ - FXP system works for identified users (remote passive)
+ - Now the quota system also stat directories.
+ - Fixed bug on the logging system : empty lines no longer logged
+ - Bug with the quota scan. The dirsize function was returning 0
+ - Fixed bug with the DELE function (always fail)
+ - Fixed bug with STOR in Binary mode (never ends)
+ - Speed enhenced : the transfert speed reached my hard-disk limit.
+ - NOOP comand now returns funny text

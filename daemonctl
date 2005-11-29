@@ -1,0 +1,115 @@
+#!/usr/local/php-nc/bin/php -q
+<?
+  set_time_limit(0);
+  if (!file_exists("config.php")) {
+    chdir(dirname($_SERVER["SCRIPT_NAME"]));
+    if (!file_exists("config.php")) {
+      @chdir("/usr/local/phpinetd");
+      if (!file_exists("config.php")) {
+        echo "Error : the phpinetd configuration file is not found.\n";
+        echo "Try to chdir to the correct directory.\n";
+        exit(4);
+      }
+    }
+  }
+  require("config.php");
+  chdir($home_dir);
+  require("funcs/sysv_shared.php");
+  $startme=false;
+  switch (strtolower($_SERVER["argv"][1])) {
+    case "start":
+      $startme=true;
+      break;
+    case "stop":
+      if (!isset($pid)) { echo("Could not stop the daemon : it's not running.\n"); exit(1); }
+      stopit();
+      break;
+    case "restart":
+      if (isset($pid)) stopit();
+      usleep(100000);
+      $startme=true;
+      break;
+    case "reload":
+      if (!isset($pid)) { echo("Could not reload the daemon : it's not running.\n"); exit(1); }
+      echo "Reloading phpInetd configuration...\n";
+      comm_set_reload();
+      break;
+    case "status":
+      if (!isset($pid)) { echo "Could not get daemon informations : it's not running.\n"; exit(1); }
+      show_info();
+      break;
+    case "running":
+      if (!isset($pid)) { echo "0"; exit(1); }
+      echo "1";
+      break;
+    default:
+      echo "Usage : ".$_SERVER["argv"][0]." { start|stop|restart|reload|status }\n";
+      exit(1);
+    //
+  }
+  if (!$startme) { comm_free(); exit; }
+  
+  function stopit() {
+    global $pid;
+    echo "Stopping the phpInetd daemon ..";
+    comm_set_shutdown();
+    while (posix_kill($pid,0)) {
+      usleep(50000);
+      echo ".";
+    }
+    echo "done\n";
+  }
+  
+  function show_info() {
+    $info=comm_import(DATA_DAEMONS);
+    $pid=comm_import(DATA_PID);
+    echo "Number of configured servers : ".count($info)." - Main thread pid : $pid\n";
+    echo "Detailed informations :\n";
+    echo "-----------------------\n";
+    echo "port\tstate\tmore\n";
+    reset($info);
+    while(list($port,$pinfo)=each($info)) {
+      echo $port."\t";
+      if (!$pinfo["up"]) {
+        echo "DOWN\t";
+        if ($pinfo["pid"]==0) {
+          echo "Daemon will be restarted as soon as possible.\n";
+        } elseif ($pinfo["pid"]>0) {
+          echo "Daemon pid was : ".$pinfo["pid"]."\n";
+        } else {
+          $p=abs($pinfo["pid"]);
+          $p=$p-time();
+          if ($p<0) $p=0;
+          echo "Daemon will be restarted in ".$p." seconds.\n";
+        }
+      } else {
+        echo "UP\t";
+        echo "PID=".$pinfo["pid"]."\n";
+      }
+    }
+  }
+  
+  if (isset($pid)) if (posix_kill($pid,0)) die("The daemon seems to be already running.\n");
+  echo "Loading phpInetd ..";
+  if (file_exists($home_dir.$pidfile)) unlink($home_dir.$pidfile);
+  $f=pcntl_fork();
+  if ($f<0) die("Could not fork !!! \n");
+  if ($f==0) { $toto=shell_exec("./start.php >/dev/null 2>&1 <&1"); exit; }
+  while (posix_kill($f,0)) {
+    usleep(50000);
+    echo ".";
+  }
+  $fil=@fopen($home_dir.$pidfile,"r");
+  if ($fil) {
+    $pid=fgets($fil,100);
+    fclose($fil);
+    if (!posix_kill($pid,0)) {
+      echo "Failed\n";
+    } else {
+      echo "done. PID=".$pid."\n";
+    }
+  } else {
+    echo "Failed\n";
+  }
+  exit;
+?>

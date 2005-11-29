@@ -1,0 +1,34 @@
+#!/bin/sh
+# phpInetd is a standalone daemon to start servers in PHP
+
+case "$1" in
+'start')
+	/usr/local/phpinetd/daemonctl start
+	;;
+'stop')
+	/usr/local/phpinetd/daemonctl stop
+	;;
+'status')
+	run=`/usr/local/phpinetd/daemonctl running`
+	res="1"
+	if [ $run != $res ]
+	then
+		echo "phpInetd is stopped. No process"
+		exit
+	fi
+	echo "Running"
+	;;
+'reload')
+	/usr/local/phpinetd/daemonctl reload
+	;;
+'full-status')
+	/usr/local/phpinetd/daemonctl status
+	;;
+'restart')
+	/usr/local/phpinetd/daemonctl restart
+	;;
+*)
+	echo "Usage: $0 { start | stop | status | restart | full-status | reload }"
+	;;
+esac
+exit 0
