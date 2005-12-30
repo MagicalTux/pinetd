@@ -10,7 +10,7 @@ set_time_limit(0);
 require("config.php");
 chdir($home_dir);
 set_time_limit(0);
-if ( (posix_getlogin()!="root") and (posix_getlogin()!="") ) die("This program must be started as root and not ".posix_getlogin().".\n");
+if (posix_getuid() != 0) die("This program must be started as root and not ".posix_getlogin().".\n");
 $fil = @fopen($pidfile,"r");
 if ($fil) {
 	$oldpid=fgets($fil,25);
