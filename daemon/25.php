@@ -326,12 +326,7 @@ function resolve_email(&$socket,$addr) {
 	if ($res['state']=='new') {
 		@mysql_query(gen_create_query('z'.$res['domainid'], '%s_accounts'));
 		@mysql_query(gen_create_query('z'.$res['domainid'], '%s_folders'));
-		$req='CREATE TABLE `phpinetd-maild`.`z'.$res['domainid'].'_mailheaders` (`id` bigint(20) unsigned NOT NULL auto_increment, ';
-		$req.='`userid` int(10) unsigned NOT NULL default \'0\', `mailid` int(10) unsigned NOT NULL default \'0\', ';
-		$req.='`header` varchar(64) NOT NULL default \'\', `content` text NOT NULL, ';
-		$req.='PRIMARY KEY  (`id`), KEY `userid` (`userid`), KEY `mailid` (`mailid`)) ';
-		$req.='ENGINE=MyISAM DEFAULT CHARSET=latin1';
-		@mysql_query($req);
+		@mysql_query(gen_create_query('z'.$res['domainid'], '%s_mailsheaders'));
 		@mysql_query(gen_create_query('z'.$res['domainid'], '%s_mails'));
 		$req='UPDATE `phpinetd-maild`.`domains` SET state=\'active\' WHERE domainid=\''.mysql_escape_string($res['domainid']).'\'';
 		@mysql_query($req);

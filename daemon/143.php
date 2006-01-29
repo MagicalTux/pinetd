@@ -3,6 +3,16 @@
  * $Id$
  * RFC 3501
  * http://www.faqs.org/rfcs/rfc3501.html
+ * 
+ * By RFC: RFC822 replaced with RFC2822 in entities
+ * 
+ * Messages flags :
+ *  - \Seen : The message has been "seen"
+ *  - \Answered : An answer to this message was posted
+ *  - \Flagged : This message is marked as "really urgent"
+ *  - \Deleted : Message will be deleted when xxx is issued
+ *  - \Draft : Not complete message
+ *  - \Recent : This message is new in this session (not alterable by client)
  */
 
 $socket_type=SOCK_STREAM;
