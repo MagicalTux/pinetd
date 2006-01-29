@@ -4,7 +4,7 @@
   // vars :
   // $current_socket : socket en cours
   // $mysql_cnx : connexion MySQL
-  // $home_dir : rép home (fini par / )
+  // $home_dir : rï¿½p home (fini par / )
   // $servername : nom du serv (eg. Ringo.FF.st ) 
   
   // http://www.faqs.org/rfcs/rfc1939.html
@@ -351,9 +351,12 @@ function pcmd_retr(&$socket,$cmdline) {
 	}
 	fclose($fp);
 	swrite($socket,'.');
-	$t=array_search('unread',$flags);
-	if ($t!==false) {
-		unset($flags[$t]);
+	$alt=false; // alteration flag for flags
+	$t=array_search('seen',$flags);
+	if ($t===false) { $flags[]='seen'; $alt = true; }
+	$t=array_search('recent',$flags);
+	if ($t!==false) { unset($flags[$t]); $alt = true; }
+	if ($alt) {
 		$flags=implode(',',$flags);
 		$req='UPDATE '.$p.'mails` SET flags=\''.mysql_escape_string($flags).'\' WHERE mailid=\''.mysql_escape_string($res['mailid']).'\'';
 		@mysql_query($req);

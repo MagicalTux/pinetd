@@ -1,22 +1,227 @@
 <?php
 // pmaild v2.0
-  // SMTP server rewrote from scratch (I miss my old source)
-  // vars :
-  // $current_socket : socket en cours
-  // $mysql_cnx : connexion MySQL
-  // $home_dir : r?p home (fini par / )
-  // $servername : nom du serv (eg. Ringo.FF.st ) 
+// SMTP server rewrote from scratch (I miss my old source)
+// vars :
+// $current_socket : socket en cours
+// $mysql_cnx : connexion MySQL
+// $home_dir : r?p home (fini par / )
+// $servername : nom du serv (eg. Ringo.FF.st ) 
   
-  $socket_type=SOCK_STREAM;
-  $socket_proto=SOL_TCP;
-  $connect_error="420 Please try again later";
-  $unknown_command="500 Command unrecognized";
+$socket_type=SOCK_STREAM;
+$socket_proto=SOL_TCP;
+$connect_error="420 Please try again later";
+$unknown_command="500 Command unrecognized";
   
-  $srv_info=array();
-  $srv_info["name"]="ESMTP Server v2.0 (pmaild v2.0 by MagicalTux <MagicalTux@gmail.com>)";
-  $srv_info["version"]="2.0.0";
+$srv_info=array();
+$srv_info["name"]="ESMTP Server v2.0 (pmaild v2.0 by MagicalTux <MagicalTux@gmail.com>)";
+$srv_info["version"]="2.0.0";
 
+$tables_struct = array(
+	'%s_accounts' => array(
+		'id' => array(
+			'type'=>'INT',
+			'size'=>10,
+			'null'=>false,
+			'unsigned'=>true,
+			'auto_increment'=>true,
+			'key'=>'PRIMARY',
+		),
+		'user' => array(
+			'type'=>'VARCHAR',
+			'size'=>64,
+			'null'=>false,
+			'default'=>'',
+			'key'=>'UNIQUE:user',
+		),
+		'password' => array(
+			'type'=>'VARCHAR',
+			'size'=>40,
+			'null'=>true,
+			'default'=>'',
+		),
+		'redirect'=>array(
+			'type'=>'VARCHAR',
+			'size'=>255,
+			'null'=>true,
+			'default'=>NULL,
+		),
+	),
+	'%s_folders' => array(
+		'id' => array(
+			'type'=>'INT',
+			'size'=>10,
+			'null'=>false,
+			'unsigned'=>true,
+			'auto_increment'=>true,
+			'key'=>'PRIMARY',
+		),
+		'account' => array(
+			'type'=>'INT',
+			'size'=>10,
+			'unsigned'=>true,
+			'null'=>false,
+			'key'=>'UNIQUE:folder',
+		),
+		'name' => array(
+			'type'=>'VARCHAR',
+			'size'=>32,
+			'null'=>false,
+			'key'=>'UNIQUE:folder',
+		),
+		'parent'=>array(
+			'type'=>'INT',
+			'size'=>10,
+			'unsigned'=>true,
+			'null'=>false,
+			'default'=>0,
+			'key'=>'UNIQUE:folder',
+		),
+	),
+	'%s_mails' => array(
+		'mailid' => array(
+			'type'=>'INT',
+			'size'=>10,
+			'null'=>false,
+			'unsigned'=>true,
+			'auto_increment'=>true,
+			'key'=>'PRIMARY',
+		),
+		'folder'=> array(
+			'type'=>'INT',
+			'size'=>10,
+			'null'=>false,
+			'unsigned'=>true,
+			'key'=>'folder',
+		),
+		'userid' => array(
+			'type'=>'INT',
+			'size'=>10,
+			'null'=>false,
+			'unsigned'=>true,
+			'key'=>'UNIQUE:userid',
+		),
+		'uniqname' => array(
+			'type'=>'VARCHAR',
+			'size'=>128,
+			'null'=>false,
+			'key'=>'UNIQUE:userid',
+		),
+		'flags' => array(
+			'type'=>'SET',
+			'values'=>array('seen','answered','flagged','deleted','draft','recent'),
+			'default'=>'recent',
+			'null'=>false,
+		),
+	),
+	'%s_mailheaders' => array(
+		'id' => array(
+			'type'=>'BIGINT',
+			'size'=>20,
+			'unsigned'=>true,
+			'null'=>false,
+			'auto_increment'=>true,
+			'key'=>'PRIMARY',
+		),
+		'userid' => array(
+			'type'=>'INT',
+			'size'=>10,
+			'unsigned'=>true,
+			'null'=>false,
+			'key'=>'usermail',
+		),
+		'mailid' => array(
+			'type'=>'INT',
+			'size'=>10,
+			'unsigned'=>true,
+			'null'=>false,
+			'key'=>'usermail',
+		),
+		'header' => array(
+			'type'=>'VARCHAR',
+			'size'=>64,
+			'null'=>false,
+			'key'=>'header',
+		),
+		'content' => array(
+			'type'=>'TEXT',
+			'null'=>false,
+			'key'=>'FULLTEXT:content',
+		),
+	),
+);
 
+function mysql_quote_escape() {
+	$args = func_get_args();
+	if (count($args)==1) {
+		$arg = $args[0];
+		if (is_array($arg)) {
+			$res = '';
+			foreach($arg as $t) {
+				$res.=($res==''?'':', ').mysql_quote_escape($t);
+			}
+			return $res;
+		}
+		if (is_null($arg)) return 'NULL';
+		return '\''.mysql_escape_string($arg).'\'';
+	}
+	$res='';
+	foreach($args as $arg) {
+		$res.=($res==''?'':', ').mysql_quote_escape($arg);
+	}
+	return $res;
+}
+
+function col_gen_type($col) {
+	$res = strtolower($col['type']);
+	switch($res) {
+		case 'set': case 'enum':
+			$res.='('.mysql_quote_escape($col['values']).')';
+			break;
+		case 'text': case 'blob':
+			break;
+		default:
+			if (isset($col['size'])) $res.='('.$col['size'].')';
+			break;
+	}
+	if ($col['unsigned']) $res.=' unsigned';
+	return $res;
+}
+
+function gen_create_query($prefix, $name) {
+	global $tables_struct;
+	if (!isset($tables_struct[$name])) return NULL;
+	$struct = $tables_struct[$name];
+	$name = sprintf($name, $prefix);
+	$req = '';
+	$keys = array();
+	foreach($struct as $cname=>$col) {
+		$tmp = '`'.$cname.'` '.col_gen_type($col);
+		if (!$col['null']) $tmp.=' NOT NULL';
+		if (isset($col['auto_increment'])) $tmp.=' auto_increment';
+		if (array_key_exists('default',$col)) $tmp.=' DEFAULT '.mysql_quote_escape($col['default']);
+		$req.=($req==''?'':', ').$tmp;
+		if (isset($col['key'])) $keys[$col['key']][]=$cname;
+	}
+	foreach($keys as $kname=>$cols) {
+		$tmp = '';
+		foreach($cols as $c) $tmp.=($tmp==''?'':', ').'`'.$c.'`';
+		$tmp='('.$tmp.')';
+		if ($kname == 'PRIMARY') {
+			$tmp = 'PRIMARY KEY '.$tmp;
+		} elseif (substr($kname, 0, 7)=='UNIQUE:') {
+			$kname = substr($kname, 7);
+			$tmp = 'UNIQUE KEY `'.$kname.'` '.$tmp;
+		} elseif (substr($kname, 0, 9)=='FULLTEXT:') {
+			$kname = substr($kname, 9);
+			$tmp = 'FULLTEXT KEY `'.$kname.'` '.$tmp;
+		} else {
+			$tmp = 'KEY `'.$kname.'` '.$tmp;
+		}
+		$req.=($req==''?'':', ').$tmp;
+	}
+	$req = 'CREATE TABLE `'.$name.'` ('.$req.') ENGINE=MyISAM DEFAULT CHARSET=latin1';
+	return $req;
+}
 
   function proto_welcome(&$socket) {
     global $home_dir,$servername;
@@ -119,29 +324,15 @@ function resolve_email(&$socket,$addr) {
 	$res['antivirus']=explode(',',$res['antivirus']);
 	$res['flags']=explode(',',$res['flags']);
 	if ($res['state']=='new') {
-		$req='CREATE TABLE `phpinetd-maild`.`z'.$res['domainid'].'_accounts` ( `id` int(10) unsigned NOT NULL auto_increment, ';
-		$req.='`user` varchar(64) NOT NULL default \'\', `password` varchar(40) default \'\', ';
-		$req.='`redirect` varchar(255) default NULL, PRIMARY KEY  (`id`), ';
-		$req.='UNIQUE KEY `user` (`user`)) ENGINE=MyISAM DEFAULT CHARSET=latin1';
-		@mysql_query($req);
-		$req='CREATE TABLE `phpinetd-maild`.`z'.$res['domainid'].'_folders` (`id` int(10) unsigned NOT NULL auto_increment, ';
-		$req.='`account` int(10) unsigned NOT NULL default \'0\', `name` varchar(32) NOT NULL default \'\', ';
-		$req.='`parent` int(10) unsigned NOT NULL default \'0\', PRIMARY KEY  (`id`), ';
-		$req.='UNIQUE KEY `account` (`account`,`name`), KEY `parent` (`parent`)';
-		$req.=') ENGINE=MyISAM DEFAULT CHARSET=latin1';
-		@mysql_query($req);
+		@mysql_query(gen_create_query('z'.$res['domainid'], '%s_accounts'));
+		@mysql_query(gen_create_query('z'.$res['domainid'], '%s_folders'));
 		$req='CREATE TABLE `phpinetd-maild`.`z'.$res['domainid'].'_mailheaders` (`id` bigint(20) unsigned NOT NULL auto_increment, ';
 		$req.='`userid` int(10) unsigned NOT NULL default \'0\', `mailid` int(10) unsigned NOT NULL default \'0\', ';
 		$req.='`header` varchar(64) NOT NULL default \'\', `content` text NOT NULL, ';
 		$req.='PRIMARY KEY  (`id`), KEY `userid` (`userid`), KEY `mailid` (`mailid`)) ';
 		$req.='ENGINE=MyISAM DEFAULT CHARSET=latin1';
 		@mysql_query($req);
-		$req='CREATE TABLE `phpinetd-maild`.`z'.$res['domainid'].'_mails` (`mailid` int(10) unsigned NOT NULL auto_increment, ';
-		$req.='`folder` int(10) unsigned NOT NULL default \'0\', `userid` int(10) unsigned NOT NULL default \'0\', ';
-		$req.='`uniqname` varchar(128) NOT NULL default \'\', `flags` set(\'unread\',\'deleted\') NOT NULL default \'unread\', ';
-		$req.='PRIMARY KEY  (`mailid`), UNIQUE KEY `userid` (`userid`,`uniqname`), KEY `folder` (`folder`) ';
-		$req.=') ENGINE=MyISAM DEFAULT CHARSET=latin1';
-		@mysql_query($req);
+		@mysql_query(gen_create_query('z'.$res['domainid'], '%s_mails'));
 		$req='UPDATE `phpinetd-maild`.`domains` SET state=\'active\' WHERE domainid=\''.mysql_escape_string($res['domainid']).'\'';
 		@mysql_query($req);
 	}
