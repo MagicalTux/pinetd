@@ -187,19 +187,19 @@ function struct_check_tables($prefix) {
 			if (!isset($f[$row['Field']])) {
 				// we got a field we don't know about
 				$req = 'ALTER TABLE `'.$table_name.'` DROP `'.$row['Field'].'`';
-				echo $req."\n";
+				@mysql_query($req);
 				continue;
 			}
 			unset($f[$row['Field']]);
 			$col = $struct[$row['Field']];
 			if ($row['Type']!=col_gen_type($col)) {
 				$req = 'ALTER TABLE `'.$table_name.'` CHANGE `'.$row['Field'].'` '.gen_field_info($row['Field'], $col);
-				echo $req."\n";
+				@mysql_query($req);
 			}
 		}
 		foreach($f as $k=>$ign) {
 			$req = 'ALTER TABLE `'.$table_name.'` ADD '.gen_field_info($k, $struct[$k]);
-			echo $req."\n";
+			@mysql_query($req);
 		}
 	}
 }
