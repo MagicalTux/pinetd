@@ -157,7 +157,7 @@ function mysql_quote_escape() {
 		if (is_array($arg)) {
 			$res = '';
 			foreach($arg as $t) {
-				$res.=($res==''?'':', ').mysql_quote_escape($t);
+				$res.=($res==''?'':',').mysql_quote_escape($t);
 			}
 			return $res;
 		}
@@ -166,9 +166,42 @@ function mysql_quote_escape() {
 	}
 	$res='';
 	foreach($args as $arg) {
-		$res.=($res==''?'':', ').mysql_quote_escape($arg);
+		$res.=($res==''?'':',').mysql_quote_escape($arg);
 	}
 	return $res;
+}
+
+function struct_check_tables($prefix) {
+	global $tables_struct;
+	foreach($tables_struct as $table_name_o=>$struct) {
+		$table_name = sprintf($table_name_o, $prefix);
+		$f = array_flip(array_keys($struct)); // field list
+		$req = 'SHOW FIELDS FROM `'.$table_name.'`';
+		$res = @mysql_query($req);
+		if (!$res) {
+			$req = gen_create_query($prefix, $table_name_o);
+			@mysql_query($req);
+			continue;
+		}
+		while($row = mysql_fetch_assoc($res)) {
+			if (!isset($f[$row['Field']])) {
+				// we got a field we don't know about
+				$req = 'ALTER TABLE `'.$table_name.'` DROP `'.$row['Field'].'`';
+				echo $req."\n";
+				continue;
+			}
+			unset($f[$row['Field']]);
+			$col = $struct[$row['Field']];
+			if ($row['Type']!=col_gen_type($col)) {
+				$req = 'ALTER TABLE `'.$table_name.'` CHANGE `'.$row['Field'].'` '.gen_field_info($row['Field'], $col);
+				echo $req."\n";
+			}
+		}
+		foreach($f as $k=>$ign) {
+			$req = 'ALTER TABLE `'.$table_name.'` ADD '.gen_field_info($k, $struct[$k]);
+			echo $req."\n";
+		}
+	}
 }
 
 function col_gen_type($col) {
@@ -187,6 +220,14 @@ function col_gen_type($col) {
 	return $res;
 }
 
+function gen_field_info($cname, $col) {
+	$tmp = '`'.$cname.'` '.col_gen_type($col);
+	if (!$col['null']) $tmp.=' NOT NULL';
+	if (isset($col['auto_increment'])) $tmp.=' auto_increment';
+	if (array_key_exists('default',$col)) $tmp.=' DEFAULT '.mysql_quote_escape($col['default']);
+	return $tmp;
+}
+
 function gen_create_query($prefix, $name) {
 	global $tables_struct;
 	if (!isset($tables_struct[$name])) return NULL;
@@ -195,11 +236,7 @@ function gen_create_query($prefix, $name) {
 	$req = '';
 	$keys = array();
 	foreach($struct as $cname=>$col) {
-		$tmp = '`'.$cname.'` '.col_gen_type($col);
-		if (!$col['null']) $tmp.=' NOT NULL';
-		if (isset($col['auto_increment'])) $tmp.=' auto_increment';
-		if (array_key_exists('default',$col)) $tmp.=' DEFAULT '.mysql_quote_escape($col['default']);
-		$req.=($req==''?'':', ').$tmp;
+		$req.=($req==''?'':', ').gen_field_info($cname, $col);
 		if (isset($col['key'])) $keys[$col['key']][]=$cname;
 	}
 	foreach($keys as $kname=>$cols) {
@@ -324,12 +361,11 @@ function resolve_email(&$socket,$addr) {
 	$res['antivirus']=explode(',',$res['antivirus']);
 	$res['flags']=explode(',',$res['flags']);
 	if ($res['state']=='new') {
-		@mysql_query(gen_create_query('z'.$res['domainid'], '%s_accounts'));
-		@mysql_query(gen_create_query('z'.$res['domainid'], '%s_folders'));
-		@mysql_query(gen_create_query('z'.$res['domainid'], '%s_mailsheaders'));
-		@mysql_query(gen_create_query('z'.$res['domainid'], '%s_mails'));
+		struct_check_tables('z'.$res['domainid']);
 		$req='UPDATE `phpinetd-maild`.`domains` SET state=\'active\' WHERE domainid=\''.mysql_escape_string($res['domainid']).'\'';
 		@mysql_query($req);
+	} else {
+		struct_check_tables('z'.$res['domainid']);
 	}
 
 	$domain_data=$res;
