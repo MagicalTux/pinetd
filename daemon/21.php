@@ -432,7 +432,7 @@ function pcmd_list(&$socket,$cmdline) {
 		return;
 	} 
 	$tmpdir=array();
-	while($fil=readdir($dir)) $tmpdir[]=$fil;
+	while(($fil=readdir($dir))!==false) $tmpdir[]=$fil;
 	closedir($dir);
 	reset($tmpdir);
 	while(list($num,$fil)=each($tmpdir)) {
