@@ -13,12 +13,49 @@
  *  - \Deleted : Message will be deleted when xxx is issued
  *  - \Draft : Not complete message
  *  - \Recent : This message is new in this session (not alterable by client)
+ * 
+ *                 +----------------------+
+ *                 |connection established|
+ *                 +----------------------+
+ *                            ||
+ *                            \/
+ *          +--------------------------------------+
+ *          |          server greeting             |
+ *          +--------------------------------------+
+ *                    || (1)       || (2)        || (3)
+ *                    \/           ||            ||
+ *          +-----------------+    ||            ||
+ *          |Not Authenticated|    ||            ||
+ *          +-----------------+    ||            ||
+ *           || (7)   || (4)       ||            ||
+ *           ||       \/           \/            ||
+ *           ||     +----------------+           ||
+ *           ||     | Authenticated  |<=++       ||
+ *           ||     +----------------+  ||       ||
+ *           ||       || (7)   || (5)   || (6)   ||
+ *           ||       ||       \/       ||       ||
+ *           ||       ||    +--------+  ||       ||
+ *           ||       ||    |Selected|==++       ||
+ *           ||       ||    +--------+           ||
+ *           ||       ||       || (7)            ||
+ *           \/       \/       \/                \/
+ *          +--------------------------------------+
+ *          |               Logout                 |
+ *          +--------------------------------------+
+ *                            ||
+ *                            \/
+ *              +-------------------------------+
+ *              |both sides close the connection|
+ *              +-------------------------------+
  */
 
 $socket_type=SOCK_STREAM;
 $socket_proto=SOL_TCP;
 $connect_error="-ERR Please try again later";
 $unknown_command="-ERR Command unrecognized";
+$socket_timeout=1800; // 30 min (as per RFC)
+
+if (!defined('DATE_RFC2822')) define('DATE_RFC2822','D, d M Y H:i:s O');
 
 $srv_info=array();
 $srv_info["name"]="IMAP4rev1 Server v2.0 (pmaild v2.0 by MagicalTux <magicaltux@gmail.com>)";
@@ -26,8 +63,126 @@ $srv_info["version"]="2.0.0";
 
 function proto_welcome(&$socket) {
 	global $home_dir,$servername;
-	$socket["log_fp"]=fopen($home_dir."log/pop3-".date("Ymd-His")."-".$socket["remote_ip"].'-'.getmypid().".log","w");
+	$socket["log_fp"]=fopen($home_dir."log/imap4-".date("Ymd-His")."-".$socket["remote_ip"].'-'.getmypid().".log","w");
 	fputs($socket["log_fp"],"Client : ".$socket["remote_ip"].":".$socket["remote_port"]." connected.\r\n");
-	swrite($socket,"+OK $servername POP3 server (phpMaild v1.1 by MagicalTux <magicaltux@gmail.com>) ready.");
+	$socket['namespace'] = 'pcmd';
+	swrite($socket,'* OK [CAPABILITY IMAP4REV1 X-NETSCAPE LOGIN-REFERRALS AUTH=LOGIN] '.$servername.' IMAP4rev1 2001.305/pMaild at '.date(DATE_RFC2822));
 }
 
+function proto_handler(&$socket, $id, $dat) {
+	$dat = substr($dat, strlen($id)+1);
+	if ($dat == '') {
+		swrite($socket, $id.' BAD Missing command');
+		return;
+	}
+	$pos=strpos($dat,' ');
+	if (!$pos) $pos=strlen($dat);
+	$cmd=substr($dat,0,$pos);
+	$cmd=strtolower($cmd);
+	$func = $socket['namespace'].'_'.$cmd;
+	if (function_exists($func)) {
+		$func($socket, $dat, $id);
+	} else {
+		swrite($socket, $id.' BAD Unknown command');
+	}
+}
+
+function ucmd_noop(&$socket, $cmdline, $id) {
+	swrite($socket, $id.' OK NOOP completed');
+}
+
+function pcmd_capability(&$socket, $cmdline, $id) {
+	swrite($socket, '* CAPABILITY IMAP4REV1 X-NETSCAPE NAMESPACE MAILBOX-REFERRALS SCAN SORT THREAD=REFERENCES THREAD=ORDEREDSUBJECT MULTIAPPEND LOGIN-REFERRALS AUTH=LOGIN');
+	swrite($socket, $id.' OK CAPABILITY completed');
+}
+function ucmd_capability(&$socket, $cmdline, $id) {
+	swrite($socket, '* CAPABILITY IMAP4REV1 X-NETSCAPE NAMESPACE MAILBOX-REFERRALS SCAN SORT THREAD=REFERENCES THREAD=ORDEREDSUBJECT MULTIAPPEND LOGIN-REFERRALS AUTH=LOGIN');
+	swrite($socket, $id.' OK CAPABILITY completed');
+}
+
+function pcmd_quit(&$socket,$cmdline, $id) {
+	global $servername;
+	swrite($socket,'* BYE '.$servername.' IMAP4rev1 server says bye !');
+	swrite($socket,$id.' OK LOGOUT completed');
+	sleep(2);
+	sclose($socket);
+	exit;
+}
+function ucmd_quit(&$socket,$cmdline, $id) {
+	global $servername;
+	swrite($socket,'* BYE '.$servername.' IMAP4rev1 server says bye !');
+	swrite($socket,$id.' OK LOGOUT completed');
+	sleep(2);
+	sclose($socket);
+	exit;
+}
+
+function pcmd_login(&$socket,$cmdline, $id) {
+  	$cmdline=explode(' ',$cmdline);
+  	$cmd=array_shift($cmdline); // "LOGIN"
+  	$login=array_shift($cmdline); // login
+  	$pass=implode(' ',$cmdline); // RFC suggests to accept spaces in password :)
+  	$pos=strrpos($login,'@');
+  	if ($pos===false) $pos=strrpos($login,'+');
+  	$domain=substr($login,$pos+1);
+  	$login =substr($login,0,$pos);
+  	$req='SELECT domainid, state, protocol FROM `phpinetd-maild`.`domains` WHERE domain = \''.mysql_escape_string($domain).'\'';
+  	$res=@mysql_query($req);
+  	$res=@mysql_fetch_assoc($res);
+  	if (!$res) {
+  		sleep(4);
+  		swrite($socket,$id.' NO Login or password invalid.');
+  		return;
+  	}
+  	$proto=explode(',',$res['protocol']);
+  	if (array_search('imap4',$proto)===false) {
+  		sleep(4);
+  		swrite($socket,$id.' NO You are not allowed to use IMAP4rev1 protocol !');
+  		return;
+  	}
+  	if ($res['state']!='active') {
+  		sleep(4);
+  		swrite($socket,$id.' NO Your domain isn\'t active yet. Please wait a little longer.');
+  		return;
+  	}
+  	$did=$res['domainid'];
+  	$p='`phpinetd-maild`.`z'.$did.'_';
+  	$req='SELECT id, password FROM '.$p.'accounts` WHERE user=\''.mysql_escape_string($login).'\'';
+  	$res=@mysql_query($req);
+  	$res=@mysql_fetch_assoc($res);
+  	if (!$res) {
+  		sleep(4);
+  		swrite($socket,$id.' NO Login or password invalid.');
+  		return;
+  	}
+  	if (is_null($res['password'])) {
+  		// special case : password is to be learned !
+  		$res['password']=crypt($pass);
+  		$req='UPDATE '.$p.'accounts` SET password=\''.mysql_escape_string($res['password']).'\' WHERE id=\''.mysql_escape_string($res['id']).'\'';
+  		@mysql_query($req);
+  	}
+  	switch(strlen($res['password'])) {
+  		case 40: $pass=sha1($pass); break;
+  		case 34: case 13: $pass=crypt($pass,$res['password']); break;
+  		case 32: $pass=md5($pass); break;
+  	}
+  	if ($pass!=$res['password']) {
+  		sleep(4);
+  		swrite($socket,$id.' NO Login or password invalid.');
+  		return;
+  	}
+  	$path=$path=PHPMAILD_STORAGE.'/domains';
+  	$path.='/'.substr($did,-1).'/'.substr($did,-2).'/'.$did;
+  	$acc=dechex($res['id']);
+  	while(strlen($acc)<4) $acc='0'.$acc;
+  	$path.='/'.substr($acc,-1).'/'.substr($acc,-2).'/'.$acc;
+  	system('mkdir -p '.escapeshellarg($path));
+  	$socket['userinfo']=array(
+  		'domainid'=>$did,
+  		'prefix'=>$p,
+  		'userid'=>$res['id'],
+  		'path'=>$path,
+  	);
+  	$socket['namespace']='ucmd';
+  	swrite($socket,$id.' OK LOGIN accepted');
+}
