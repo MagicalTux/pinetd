@@ -260,6 +260,11 @@ function pcmd_list(&$socket,$cmdline) {
 	}
 	$res=@mysql_query($req);
 	while($resu=@mysql_fetch_assoc($res)) {
+		if (!file_exists(($socket['userinfo']['path'].'/'.$resu['uniqname']))) {
+			$req = 'DELETE FROM '.$p.'mails` WHERE mailid=\''.mysql_escape_string($resu['mailid']).'\'';
+			@mysql_query($req);
+			continue;
+		}
 		if (isset($socket['dele'][$resu['mailid']])) continue;
 		$flags=explode(',',$resu['flags']);
 		if (array_search('deleted',$flags)!==false) continue;
