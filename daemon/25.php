@@ -391,7 +391,7 @@ function resolve_email(&$socket,$addr) {
 	if ($pos===false) return NULL;
 	$user = substr($addr,0,$pos);
 	$domain=substr($addr,$pos+1);
-	$req='SELECT domainid, defaultuser, state, flags, antispam, antivirus FROM `phpinetd-maild`.`domains` WHERE domain=\''.mysql_escape_string($domain).'\'';
+	$req='SELECT domainid, defaultuser, state, flags, antispam, antivirus FROM `'.MYSQL_DB_NAME.'`.`domains` WHERE domain=\''.mysql_escape_string($domain).'\'';
 	$res=@mysql_query($req);
 	$res=@mysql_fetch_assoc($res);
 	if (!$res) return '550 Relaying denied for this domain';
@@ -414,7 +414,7 @@ function resolve_email(&$socket,$addr) {
 
 	$domain_data=$res;
 	// table prefix
-	$p='`phpinetd-maild`.`z'.$res['domainid'].'_';
+	$p='`'.MYSQL_DB_NAME.'`.`z'.$res['domainid'].'_';
 	// check for account
 	$req='SELECT id FROM '.$p.'accounts` WHERE user=\''.mysql_escape_string($user).'\'';
 	$res=@mysql_query($req);
@@ -454,6 +454,8 @@ function resolve_email(&$socket,$addr) {
 		'email'=>$user.'@'.$domain,
 		'headers'=>'Delivered-To: <'.$user.'@'.$domain.'>'."\r\n",
 	);
+	$req = 'UPDATE `'.MYSQL_DB_NAME.'`.`domains` SET `last_recv`=NOW() WHERE `domainid` = \''.mysql_escape_string($domain_data['domainid']).'\'';
+	@mysql_query($req);
 	$socket['antispam']=$domain_antispam;
 	return $res;
 }
