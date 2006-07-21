@@ -166,6 +166,9 @@ function pcmd_pass(&$socket,$cmdline) {
   	}
 	$req = 'UPDATE '.$p.'accounts` SET `last_login`=NOW() WHERE id=\''.mysql_escape_string($res['id']).'\'';
 	@mysql_query($req);
+	$req = 'REPLACE INTO `phpinetd-maild`.`hosts` SET `ip`=\''.mysql_escape_string($socket['remote_ip']).'\' ';
+	$req.= '`type` = \'trust\', `regdate` = NOW(), `expires` = DATE_ADD(NOW(), INTERVAL 2 HOUR)';
+	@mysql_query($req);
   	$path=PHPMAILD_STORAGE.'/domains';
   	$path.='/'.substr($did,-1).'/'.substr($did,-2).'/'.$did;
   	$acc=dechex($res['id']);
