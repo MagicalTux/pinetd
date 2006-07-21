@@ -167,7 +167,8 @@ function pcmd_pass(&$socket,$cmdline) {
 	$req = 'UPDATE '.$p.'accounts` SET `last_login`=NOW() WHERE id=\''.mysql_escape_string($res['id']).'\'';
 	@mysql_query($req);
 	$req = 'REPLACE INTO `phpinetd-maild`.`hosts` SET `ip`=\''.mysql_escape_string($socket['remote_ip']).'\', ';
-	$req.= '`type` = \'trust\', `regdate` = NOW(), `expires` = DATE_ADD(NOW(), INTERVAL 2 HOUR)';
+	$req.= '`type` = \'trust\', `regdate` = NOW(), `expires` = DATE_ADD(NOW(), INTERVAL 2 HOUR), ';
+	$req.= '`user_email` = \''.mysql_escape_string($login.'@'.$domain).'\'';
 	@mysql_query($req);
 	$req = 'DELETE FROM `phpinetd-maild`.`hosts` WHERE `expires` < NOW()';
 	@mysql_query($req);
