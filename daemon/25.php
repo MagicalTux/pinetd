@@ -394,6 +394,7 @@ function resolve_email(&$socket,$addr) {
 	$req='SELECT domainid, defaultuser, state, flags, antispam, antivirus FROM `phpinetd-maild`.`domains` WHERE domain=\''.mysql_escape_string($domain).'\'';
 	$res=@mysql_query($req);
 	$res=@mysql_fetch_assoc($res);
+	if (!$res) return '550 Relaying denied for this domain';
 	$domain_antispam=false;
 	if ( ($res['antispam']!='') or ($res['antivirus']!='')) {
 		// special case : if we have to use an antispam system, we MUST have only one RCPT TO line
@@ -419,15 +420,28 @@ function resolve_email(&$socket,$addr) {
 	$res=@mysql_query($req);
 	$res=@mysql_fetch_assoc($res);
 	if (!$res) {
-		if (array_search('create_account_on_mail',$domain_data['flags'])!==false) {
-			$req='INSERT INTO '.$p.'accounts` SET user=\''.mysql_escape_string($user).'\', password=NULL';
-			if (!@mysql_query($req)) return '450 Temporary error in domain name. Please check SQL state.';
-			$account_id=mysql_insert_id();
+		// check for alias
+		$req='SELECT `real_target`, `id` FROM '.$p.'alias` WHERE user=\''.mysql_escape_string($user).'\'';
+		$res=@mysql_query($req);
+		$res=@mysql_fetch_assoc($res);
+		if ($res) {
+			$account_id=$res['real_target'];
+			$req = 'UPDATE '.$p.'alias` SET `last_transit`=NOW() WHERE id=\''.mysql_escape_string($res['id']).'\'';
+			@mysql_query($req);
 		} else {
-			if (!is_null($domain_data['defaultuser'])) {
-				$account_id=$domain_data['defaultuser'];
+			// check for create_account_on_mail
+			if (array_search('create_account_on_mail',$domain_data['flags'])!==false) {
+				$req='INSERT INTO '.$p.'accounts` SET user=\''.mysql_escape_string($user).'\', password=NULL';
+				if (!@mysql_query($req)) return '450 Temporary error in domain name. Please check SQL state.';
+				$account_id=mysql_insert_id();
 			} else {
-				return '500 Mailbox not found';
+				// check for defaultuser
+				if (!is_null($domain_data['defaultuser'])) {
+					$account_id=$domain_data['defaultuser'];
+				} else {
+					// no mailbox found !
+					return '500 Mailbox not found';
+				}
 			}
 		}
 	} else {
