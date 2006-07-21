@@ -275,7 +275,6 @@ while(!$client) { // mit sur true si le thread est forké et deviens un thread cl
 		if ($res>0) {
 			// le client est déconnecté
 			unset($clients[$pid]);
-			@mysql_close($data["mysql"]); // un peu de ménage en partant... :p
 		}
 		if ($data['start']<(time()-7200)) {
 			if ($data['start']<(time()-7320)) {
@@ -303,7 +302,6 @@ while(!$client) { // mit sur true si le thread est forké et deviens un thread cl
 		if (function_exists("proto_check")) $accept=proto_check($socket,$clients);
 		if ($accept) {
 			logstr("Service $server_port - connexion from ".$socket["remote_ip"]);
-			$mysql_cnx=getsql();
 			$pid=cfork(false);
 			if ($pid == -1) {
 				logstr("Service $server_port - could not fork for client ".$socket["remote_ip"]);
@@ -312,10 +310,9 @@ while(!$client) { // mit sur true si le thread est forké et deviens un thread cl
 				$socket=false;
 				unset($addr);
 				unset($port);
-				mysql_close($mysql_cnx);
 			} elseif ($pid) {
 				$socket=false;
-				$clients[$pid]=array("mysql" => $mysql_cnx, "ip" => $addr, 'start'=>time());
+				$clients[$pid]=array("ip" => $addr, 'start'=>time());
 				unset($addr);
 				unset($port);
 			} else {
@@ -325,6 +322,8 @@ while(!$client) { // mit sur true si le thread est forké et deviens un thread cl
 	}
 }
 socket_close($master_socket);
+$mysql_cnx=getsql();
+$socket['mysql'] = $mysql_cnx;
 proto_welcome($socket);
 $socket["remote_host"] = gethostbyaddr($socket["remote_ip"]);
 if (isset($socket["log_fp"])) {

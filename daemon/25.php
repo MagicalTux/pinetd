@@ -205,7 +205,7 @@ function struct_check_tables($prefix) {
 			}
 		}
 		foreach($f as $k=>$ign) {
-			$req = 'ALTER TABLE `'.$table_name.'` ADD '.gen_field_info($k, $struct[$k]);
+			$req = 'ALTER TABLE `'.MYSQL_DB_NAME.'`.`'.$table_name.'` ADD '.gen_field_info($k, $struct[$k]);
 			@mysql_query($req);
 		}
 	}
@@ -267,67 +267,75 @@ function gen_create_query($prefix, $name) {
 	return $req;
 }
 
-  function proto_welcome(&$socket) {
-    global $home_dir,$servername;
-    $socket["log_fp"]=fopen($home_dir."log/smtp-".date("Ymd-His")."-".$socket["remote_ip"].".log","w");
-    fputs($socket["log_fp"],"Client : ".$socket["remote_ip"].":".$socket["remote_port"]." connected.\r\n");
-    swrite($socket,"220 $servername ESMTP (phpMaild v1.1 by MagicalTux <MagicalTux@gmail.com>) ready.");
-  }
-  function pcmd_quit(&$socket,$cmdline) {
-  	global $servername;
-    swrite($socket,'221 '.$servername.' closing control connexion. Mata ne~ !',true);
-    sleep(2); // make sure buffer is flushed
-    sclose($socket);
-    exit;
-  }
+function proto_welcome(&$socket) {
+	global $home_dir,$servername;
+	if (!$socket['mysql']) {
+		swrite($socket, '400 Sorry, no database backend available for now. Please retry later.');
+		sleep(2);
+		sclose($socket);
+		exit;
+	}
+	$socket["log_fp"]=fopen($home_dir."log/smtp-".date("Ymd-His")."-".$socket["remote_ip"].".log","w");
+	fputs($socket["log_fp"],"Client : ".$socket["remote_ip"].":".$socket["remote_port"]." connected.\r\n");
+	swrite($socket,"220 $servername ESMTP (phpMaild v1.1 by MagicalTux <MagicalTux@gmail.com>) ready.");
+}
+
+function pcmd_quit(&$socket,$cmdline) {
+	global $servername;
+	swrite($socket,'221 '.$servername.' closing control connexion. Mata ne~ !',true);
+	sleep(2); // make sure buffer is flushed
+	sclose($socket);
+	exit;
+}
   
-  function pcmd_expn(&$socket,$cmdline) {
-  	pcmd_vrfy($socket,$cmdline);
-  }
+function pcmd_expn(&$socket,$cmdline) {
+	pcmd_vrfy($socket,$cmdline);
+}
   
-  function pcmd_vrfy(&$socket,$cmdline) {
-    // syntax : vrfy <mail>
-    swrite($socket,'502 I won\'t let you check if this email exists, however RFC said I should reply with a 502 message.');
-  }
+function pcmd_vrfy(&$socket,$cmdline) {
+	// syntax : vrfy <mail>
+	swrite($socket,'502 I won\'t let you check if this email exists, however RFC said I should reply with a 502 message.');
+}
   
-  // useless function
-  function pcmd_noop(&$socket,$cmdline) {
-  	swrite($socket,'250 Ok');
-  }
+// useless function
+function pcmd_noop(&$socket,$cmdline) {
+	swrite($socket,'250 Ok');
+}
   
-  function pcmd_ehlo(&$socket,$cmdline) {
-    pcmd_helo($socket,$cmdline,false);
-  }
+function pcmd_ehlo(&$socket,$cmdline) {
+	pcmd_helo($socket,$cmdline,false);
+}
   
-  function pcmd_helo(&$socket,$cmdline,$oldprot=true) {
-  	global $servername;
-    if ($socket["helo"]) {
-      swrite($socket,'503 I don\'t know why you say good bye, I say hello~ (Hello goodbye, The Beatles)');
-    } else {
-      $socket["helo"]=true;
-      $remote=explode(" ",$cmdline);
-      $remote=$remote[1];
-      $real=$socket['remote_host'].' ['.$socket['remote_ip'].']';
-      if ($remote) {
-      	$remote=$remote.' ('.$real.')';
-      } else {
-      	$remote=$real;
-      }
-      $socket["remdat"]=$remote;
-      if ($oldprot) {
-        swrite($socket,'250 '.$servername.' Pleased to meet you, '.$remote.'.');
-      } else {
-        swrite($socket,'250-'.$servername.' Pleased to meet you, '.$remote.'.');
-        swrite($socket,'250-PIPELINING');
-        swrite($socket,'250-ETRN');
-        swrite($socket,"250 8BITMIME");
-      }
-    }
-  }
-  function pcmd_help(&$socket,$cmdline) {
-    // help system...
-    swrite($socket,'214 http://www.faqs.org/rfcs/rfc2821.html');
-  }
+function pcmd_helo(&$socket,$cmdline,$oldprot=true) {
+	global $servername;
+	if ($socket["helo"]) {
+		swrite($socket,'503 I don\'t know why you say good bye, I say hello~ (Hello goodbye, The Beatles)');
+	} else {
+		$socket["helo"]=true;
+		$remote=explode(" ",$cmdline);
+		$remote=$remote[1];
+		$real=$socket['remote_host'].' ['.$socket['remote_ip'].']';
+		if ($remote) {
+			$remote=$remote.' ('.$real.')';
+		} else {
+			$remote=$real;
+		}
+		$socket["remdat"]=$remote;
+		if ($oldprot) {
+			swrite($socket,'250 '.$servername.' Pleased to meet you, '.$remote.'.');
+		} else {
+			swrite($socket,'250-'.$servername.' Pleased to meet you, '.$remote.'.');
+			swrite($socket,'250-PIPELINING');
+			swrite($socket,'250-ETRN');
+			swrite($socket,"250 8BITMIME");
+		}
+	}
+}
+
+function pcmd_help(&$socket,$cmdline) {
+	// help system...
+	swrite($socket,'214 http://wiki.ooKoo.org/wiki/pinetd');
+}
 
 function pcmd_mail(&$socket,$cmdline) {
 	if (!$socket["helo"]) {
