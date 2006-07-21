@@ -41,6 +41,11 @@ $tables_struct = array(
 			'null'=>true,
 			'default'=>'',
 		),
+		'last_login' => array(
+			'type'=>'DATETIME',
+			'null'=>true,
+			'default'=>NULL,
+		),
 		'redirect'=>array(
 			'type'=>'VARCHAR',
 			'size'=>255,
@@ -212,7 +217,7 @@ function col_gen_type($col) {
 		case 'set': case 'enum':
 			$res.='('.mysql_quote_escape($col['values']).')';
 			break;
-		case 'text': case 'blob':
+		case 'text': case 'blob': case 'datetime':
 			break;
 		default:
 			if (isset($col['size'])) $res.='('.$col['size'].')';
