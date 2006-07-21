@@ -20,6 +20,12 @@
 
 function proto_welcome(&$socket) {
 	global $home_dir,$servername;
+	if (!$socket['mysql']) {
+		swrite($socket, '-ERR No database backend available. Please retry later.');
+		sleep(2);
+		sclose($socket);
+		exit;
+	}
 	$socket["log_fp"]=fopen($home_dir."log/pop3-".date("Ymd-His")."-".$socket["remote_ip"].'-'.getmypid().".log","w");
 	fputs($socket["log_fp"],"Client : ".$socket["remote_ip"].":".$socket["remote_port"]." connected.\r\n");
 	swrite($socket,"+OK $servername POP3 server (phpMaild v1.1 by MagicalTux <magicaltux@gmail.com>) ready.");
