@@ -53,6 +53,34 @@ $tables_struct = array(
 			'default'=>NULL,
 		),
 	),
+	'%s_alias' => array(
+		'id' => array(
+			'type'=>'INT',
+			'size'=>10,
+			'null'=>false,
+			'unsigned'=>true,
+			'auto_increment'=>true,
+			'key'=>'PRIMARY',
+		),
+		'user' => array(
+			'type'=>'VARCHAR',
+			'size'=>64,
+			'null'=>false,
+			'default'=>'',
+			'key'=>'UNIQUE:user',
+		),
+		'last_transit' => array(
+			'type'=>'DATETIME',
+			'null'=>true,
+			'default'=>NULL,
+		),
+		'real_target' => array(
+			'type'=>'INT',
+			'size'=>10,
+			'null'=>false,
+			'unsigned'=>true,
+		),
+	),
 	'%s_folders' => array(
 		'id' => array(
 			'type'=>'INT',
