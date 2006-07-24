@@ -486,6 +486,7 @@ function pcmd_rcpt(&$socket,$cmdline) {
 						'origin'=>$res[0],
 						'email'=>$adress,
 					);
+					swrite($socket, '250 Relaying granted for you, '.$res[0]);
 				} else {
 					swrite($socket,"550 Relaying denied.");
 				}
