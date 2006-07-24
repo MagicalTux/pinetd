@@ -575,7 +575,7 @@ function pcmd_data(&$socket,$cmdline) {
 					stream_copy_to_stream($wrmail,$out);
 					fclose($out);
 					$req = 'INSERT INTO `'.PHPMAILD_DB_NAME.'`.`mailqueue` SET ';
-					$req.= '`mlid`=\''.mysql_escape_string($target).'\', ';
+					$req.= '`mlid`=\''.mysql_escape_string(basename($target)).'\', ';
 					if (isset($socket["mail_from"])) $req.= '`from`=\''.mysql_escape_string($socket["mail_from"]).'\', ';
 					$req.= '`to`=\''.mysql_escape_string($data['email']).'\', ';
 					$req.= '`queued` = NOW()';
