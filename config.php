@@ -12,7 +12,6 @@ $sql_user="";
 $sql_pass="";
 $sql_host="";
   
-  
 // FTP specific
 $max_users=120;
 $max_anonymous=80;
@@ -20,6 +19,10 @@ $ftp_server=""; // which server is it ?
 $max_users_per_ip=3;
 $ftp_owner_u="nobody";
 $ftp_owner_g="nogroup";
+
+// List of daemons to *not* load
+$daemon_noload = array(
+);
 
 // phpmaild specific
 define('PHPMAILD_STORAGE','/var/spool/phpmaild');

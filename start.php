@@ -65,6 +65,8 @@ while($fil=readdir($dir)) {
 	}
 }
 
+foreach($daemon_noload as $d) if (isset($daemons[$d])) unset($daemons[$d]);
+
 if (!$daemons) {
 	logstr("FATAL: no daemon defined !");
 }
@@ -183,6 +185,7 @@ while (is_null($server_port)) {
 					}
 				}
 				closedir($dir);
+				foreach($daemon_noload as $da) if (isset($d2[$da])) unset($d2[$da]);
 				reset($d2);
 				while(list($port,$state)=each($d2)) {
 					if ( (!isset($d[$port])) and ($state>0) ) {
