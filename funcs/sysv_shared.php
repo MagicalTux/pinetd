@@ -62,14 +62,14 @@
     global $shared_mem,$server_port;
     $sd=shm_get_var($shared_mem,DATA_REHASH);
     if (!is_array($sd)) return false;
-    if (isset($sd[$server_port])) return true;
+    if (isset($sd[(int)$server_port])) return true;
     return false;
   }
   function comm_check_shutdown() {
     global $shared_mem,$server_port;
     $sd=shm_get_var($shared_mem,DATA_SHUTDOWN);
     if (!is_array($sd)) return false;
-    if (isset($sd[$server_port])) return true;
+    if (isset($sd[(int)$server_port])) return true;
     return false;
   }
   function comm_clear_reload($dest=0) {
