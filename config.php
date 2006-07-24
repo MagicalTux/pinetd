@@ -2,11 +2,11 @@
 
 die('Please edit configuration'."\n");
 
-  // configuration for PHP Inetd
-  $home_dir=dirname(__FILE__);
-  $servername="";
-  $pidfile="system.pid";
-  $bind_ip=""; // ip de bind pour les services
+// configuration for PHP Inetd
+$home_dir=dirname(__FILE__).'/';
+$servername="";
+$pidfile="system.pid";
+$bind_ip=""; // ip de bind pour les services
 //  $pasv_ip=""; // a ne définir qu'en cas de NAT
   
   $sql_user="";

@@ -90,7 +90,7 @@ if (is_null($server_port)) {
 	$shutdown=false;
 }
 
-while (!is_null($server_port)) {
+while (is_null($server_port)) {
 	// as long as we don't fork
 	sleep(1); // idle time : 1sec
 	$info=array();
