@@ -3,7 +3,7 @@
 die('Please edit configuration'."\n");
 
   // configuration for PHP Inetd
-  $home_dir="/usr/local/phpinetd/";
+  $home_dir=dirname(__FILE__);
   $servername="";
   $pidfile="system.pid";
   $bind_ip=""; // ip de bind pour les services
