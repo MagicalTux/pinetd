@@ -48,23 +48,30 @@ $daemons=array();
 while ($fil=readdir($dir)) {
 	if (substr($fil,-4)==".php") {
 		$fil=substr($fil,0,strlen($fil)-4);
-		$fil2=$fil-4;
-		$fil2+=4;
+		$fil2=(int)$fil;
 		if ($fil == $fil2) $daemons[$fil2]=0;
 	}
 }
 
-if (count($daemons)<1) {
+// check for subprocesses
+$dir=@opendir('subprocess');
+while($fil=readdir($dir)) {
+	if (substr($fil,-4)==".php") {
+		$fil=substr($fil,0,strlen($fil)-4);
+		$daemons[$fil]=0;
+	}
+}
+
+if (!$daemons) {
 	logstr("FATAL: no daemon defined !");
 }
-reset($daemons);
 $res=0;
-$server_port=0;
+$server_port=null;
 include("funcs/sysv_shared.php"); // method for comm
-while (list($port,$pid)=each($daemons)) {
+foreach($daemons as $port=>$pid) {
 	$pid=cfork(false);
 	if ($pid == -1) {
-		logstr("Error forking for port $port ...");
+		logstr("Error forking service $port ...");
 		$daemons[$port]=-(time()+10); // retry in 10 secs
 	} elseif ($pid) {
 		$daemons[$port]=$pid;
@@ -72,21 +79,22 @@ while (list($port,$pid)=each($daemons)) {
 	} else {
 		$server_port=$port;
 		comm_child_channel();
-		logstr("Server for port $port forked. Status ok");
+		logstr("Service $port has just forked.");
 		break;
 	}
 }
 
-if ($server_port == 0) {
-	logstr("System ready. $res servers successfully loaded");
+if (is_null($server_port)) {
+	// We're still parent
+	logstr("System ready. $res services successfully loaded");
 	$shutdown=false;
 }
-while ($server_port == 0) {
-	// tant kon forke pas :p
+
+while (!is_null($server_port)) {
+	// as long as we don't fork
 	sleep(1); // idle time : 1sec
-	reset($daemons);
 	$info=array();
-	while(list($port,$pid)=each($daemons)) {
+	foreach($daemons as $port=>$pid) {
 		$pid2=$pid;
 		if ($pid>0) {
 			$res=pcntl_waitpid($pid,$status,WNOHANG);
@@ -114,8 +122,7 @@ while ($server_port == 0) {
 		logstr("Shutting down (requested)...");
 		$d=$daemons;
 		$daemons=array();
-		reset($d);
-		while(list($port,$pid)=each($d)) {
+		foreach($d as $port=>$pid) {
 			if ($pid>0) { comm_set_shutdown($port); posix_kill($pid,0); } // posix kill would force the process to wake up
 			if ($pid<1) unset($d[$port]);
 		}
@@ -128,7 +135,7 @@ while ($server_port == 0) {
 				if ($sta==0) {
 					unset($d[$port]);
 				} elseif ($max<time()) {
-					logstr("Killing process for port $port [$pid] (not returning)");
+					logstr("Killing service $port [$pid] (stop timeout)");
 					posix_kill($pid,SIGKILL);
 					unset($d[$port]);
 				} else {
@@ -164,6 +171,15 @@ while ($server_port == 0) {
 						}
 					}
 				}
+				closedir($dir);
+				$dir=@opendir('subprocess');
+				while ($fil=readdir($dir)) {
+					if (substr($fil,-4)==".php") {
+						$fil=substr($fil,0,strlen($fil)-4);
+						$d[$fil]=true;
+					}
+				}
+				closedir($dir);
 				reset($d2);
 				while(list($port,$state)=each($d2)) {
 					if ( (!isset($d[$port])) and ($state>0) ) {
@@ -198,13 +214,13 @@ while ($server_port == 0) {
 		unset($d3);
 	}
 	// final while !
-	reset($daemons);
-	while ( ($server_port == 0) and (list($port,$pid)=each($daemons)) ) {
+	foreach($daemons as $port=>$pid) {
+		if (!is_null($server_port)) break;
 		if ($pid == 0) {
 			// redémarrage immédiat !
 			$pid=cfork(false);
 			if ($pid == -1) {
-				logstr("Error forking for port $port ...");
+				logstr("Error forking for service $port ...");
 				$daemons[$port]=-(time()+10); // retry in 10 secs
 			} elseif ($pid) {
 				$daemons[$port]=$pid;
@@ -217,7 +233,7 @@ while ($server_port == 0) {
 			if ($pid < time()) {
 				$pid=cfork(false);
 				if ($pid == -1) {
-					logstr("Error forking for port $port ...");
+					logstr("Error forking for service $port ...");
 					$daemons[$port]=-(time()+10); // retry in 10 secs
 				} elseif ($pid) {
 					$daemons[$port]=$pid;
@@ -239,9 +255,32 @@ while ($fil=readdir($dir)) {
 closedir($dir);
 
 // step 1 : include the port file for informations
-if (!include("daemon/".$server_port.".php")) {
-	logstr("FATAL : could not load daemon for port $server_port ...");
-	exit(60); // 60 secs before retry
+if (is_numeric($server_port)) {
+	if (!include("daemon/".$server_port.".php")) {
+		logstr("FATAL : could not load daemon for port $server_port ...");
+		exit(60); // 60 secs before retry
+	}
+} else {
+	if (!include("subprocess/".$server_port.".php")) {
+		logstr("FATAL : could not load subprocess $server_port ...");
+		exit(60);
+	}
+	while(1) {
+		sleep(1);
+		if (comm_check_shutdown()) {
+			comm_clear_shutdown($server_port);
+			logstr("Closing subprocess $server_port [".posix_getpid()."] : requested.");
+			comm_free();
+			exit;
+		}
+		if (comm_check_reload()) {
+			comm_clear_reload($server_port);
+			chdir($home_dir);
+			if (file_exists("config.php")) require("config.php");
+			if (function_exists('func_reload')) func_reload();
+		}
+		main_loop();
+	}
 }
 $master_socket=socket_init($socket_type,$socket_proto,$server_port,$bind_ip);
 socket_set_nonblock($master_socket);
