@@ -564,6 +564,7 @@ function pcmd_data(&$socket,$cmdline) {
 				$lin=sread($socket);
 			} while($lin!=".");
 			unset($h);
+			$q = false;
 			foreach($socket["mail_to"] as $data) {
 				// Remote delivery
 				if (is_null($data['account'])) {
@@ -580,6 +581,7 @@ function pcmd_data(&$socket,$cmdline) {
 					$req.= '`to`=\''.mysql_escape_string($data['email']).'\', ';
 					$req.= '`queued` = NOW()';
 					@mysql_query($req);
+					$q = true;
 					continue;
 				}
 				// pre-Local delivery (antivirus/antispam check)
@@ -619,7 +621,7 @@ function pcmd_data(&$socket,$cmdline) {
 			}
 			fclose($wrmail);
 			unlink($filename);
-			swrite($socket,'250 Mail delivered.');
+			swrite($socket,($q?'250 Mail queued, pending delivery.':'250 Mail delivered.'));
 			if (isset($socket["mail_from"])) unset($socket["mail_from"]);
 			if (isset($socket["mail_to"])) unset($socket["mail_to"]);
 			if (isset($socket['antispam'])) unset($socket['antispam']);
