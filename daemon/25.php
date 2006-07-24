@@ -385,13 +385,13 @@ function pcmd_mail(&$socket,$cmdline) {
 function resolve_email(&$socket,$addr) {
 	if (isset($socket['antispam'])) return '400 Please provide only ONE RCPT TO';
 	$pos=strrpos($addr,'@');
-	if ($pos===false) return NULL;
+	if ($pos===false) return false;
 	$user = substr($addr,0,$pos);
 	$domain=substr($addr,$pos+1);
 	$req='SELECT domainid, defaultuser, state, flags, antispam, antivirus FROM `'.PHPMAILD_DB_NAME.'`.`domains` WHERE domain=\''.mysql_escape_string($domain).'\'';
 	$res=@mysql_query($req);
 	$res=@mysql_fetch_assoc($res);
-	if (!$res) return '550 Relaying denied for this domain';
+	if (!$res) return false;
 	$domain_antispam=false;
 	if ( ($res['antispam']!='') or ($res['antivirus']!='')) {
 		// special case : if we have to use an antispam system, we MUST have only one RCPT TO line
@@ -473,7 +473,22 @@ function pcmd_rcpt(&$socket,$cmdline) {
 			} elseif (is_string($rel)) {
 				swrite($socket,$rel);
 			} elseif ($rel===false) {
-				swrite($socket,"550 Relaying denied.");
+				// check for relaying
+				$req = 'SELECT `user_email` FROM `'.PHPMAILD_DB_NAME.'`.`hosts` ';
+				$req.= 'WHERE `ip` = \''.mysql_escape_string($socket['remote_ip']).'\' ';
+				$req.= 'AND `type` = \'trust\' AND `expires` > NOW()';
+				$res = @mysql_query($req);
+				$res = @mysql_fetch_row($res);
+				if ($res) {
+					if (!is_array($socket["mail_to"])) $socket["mail_to"]=array();
+					$socket["mail_to"][]=array(
+						'account'=>null,
+						'origin'=>$res[0],
+						'email'=>$adress,
+					);
+				} else {
+					swrite($socket,"550 Relaying denied.");
+				}
 			} else {
 				swrite($socket,"550 mailbox doesn't exists");
 			}
@@ -501,7 +516,7 @@ function make_uniq($subpath,$domain=null,$account=null) {
 		while(strlen($acc)<4) $acc='0'.$acc;
 		$path.='/'.substr($acc,-1).'/'.substr($acc,-2).'/'.$acc;
 	}
-	system('mkdir -p '.escapeshellarg($path));
+	mkdir($path, 0755, true);
 	$path.='/';
 	$tmp=explode(' ',microtime());
 	$path.=$tmp[1].'.'.substr($tmp[0],2).'.'.code(5).getmypid().'.'.$servername;
@@ -521,7 +536,7 @@ function pcmd_data(&$socket,$cmdline) {
 		} else {
 			$newmail = "Received: from ".$socket["remdat"]."\r\n";
 			$newmail.= "\tby $servername (phpinetd by MagicalTux <magicaltux@gmail.com>) with SMTP\r\n";
-			$newmail.= "\tversion 1.0; ".date("D, d M Y H:i:s T") . "\r\n";
+			$newmail.= "\tversion 1.0; ".date("D, d M Y H:i:s O") . "\r\n";
 			fputs($wrmail,$newmail);
 			$headers=array();
 			$headers[]=str_replace("\r",'',str_replace("\n",'',str_replace("\t",' ',$newmail)));
@@ -549,6 +564,24 @@ function pcmd_data(&$socket,$cmdline) {
 			} while($lin!=".");
 			unset($h);
 			foreach($socket["mail_to"] as $data) {
+				// Remote delivery
+				if (is_null($data['account'])) {
+					// mail to MQueue
+					$target=make_uniq('mailqueue');
+					$out=fopen($target,'w');
+					fwrite($out,'Received: (pmaild '.getmypid().' invoked for user '.$data['origin'].'); '.date("D, d M Y H:i:s O")."\r\n");
+					fseek($wrmail,0);
+					stream_copy_to_stream($wrmail,$out);
+					fclose($out);
+					$req = 'INSERT INTO `'.PHPMAILD_DB_NAME.'`.`mailqueue` SET ';
+					$req.= '`mlid`=\''.mysql_escape_string($target).'\', ';
+					if (isset($socket["mail_from"])) $req.= '`from`=\''.mysql_escape_string($socket["mail_from"]).'\', ';
+					$req.= '`to`=\''.mysql_escape_string($data['email']).'\', ';
+					$req.= '`queued` = NOW()';
+					@mysql_query($req);
+					continue;
+				}
+				// pre-Local delivery (antivirus/antispam check)
 				if ( (run_antivirus($socket, $filename, $data['domain_data']['antivirus'])>0) 
 					|| (run_antispam($socket, $filename, $wrmail, $data['domain_data']['antispam'])>0) )
 				{
@@ -559,12 +592,14 @@ function pcmd_data(&$socket,$cmdline) {
 					unlink($filename);
 					return;
 				}
+				// Local delivery
 				$target=make_uniq('domains',$data['domain'],$data['account']);
 				$out=fopen($target,'w');
 				fwrite($out,'Return-Path: <'.$socket['mail_from'].'>'."\r\n");
 				fwrite($out,$data['headers']);
 				fseek($wrmail,0);
 				stream_copy_to_stream($wrmail,$out);
+				fclose($out);
 				$p='`'.PHPMAILD_DB_NAME.'`.`z'.$data['domain'].'_';
 				$req='INSERT INTO '.$p.'mails` SET folder=0, userid=\''.mysql_escape_string($data['account']).'\', ';
 				$req.='uniqname=\''.mysql_escape_string(basename($target)).'\'';

@@ -25,4 +25,7 @@ $ftp_owner_g="nogroup";
 define('PHPMAILD_STORAGE','/var/spool/phpmaild');
 define('PHPMAILD_DEFAULT_DOMAIN','example.com');
 define('PHPMAILD_DB_NAME','phpinetd-maild');
+// pmaild : max processes count for sending outgoing emails
+$pmaild_mta_max_processes = 5;
+$pmaild_mta_thread_start_threshold = 5; // start 1 thread each 5 mails to send
 
