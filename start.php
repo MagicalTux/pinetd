@@ -265,10 +265,12 @@ if (is_numeric($server_port)) {
 		logstr("FATAL : could not load subprocess $server_port ...");
 		exit(60);
 	}
+	$mysql_cnx=getsql();
 	while(1) {
 		sleep(1);
 		if (comm_check_shutdown()) {
 			comm_clear_shutdown($server_port);
+			if (function_exists('func_shutdown')) func_shutdown();
 			logstr("Closing subprocess $server_port [".posix_getpid()."] : requested.");
 			comm_free();
 			exit;
