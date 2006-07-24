@@ -4,7 +4,6 @@
 // vars :
 // $current_socket : socket en cours
 // $mysql_cnx : connexion MySQL
-// $home_dir : r?p home (fini par / )
 // $servername : nom du serv (eg. Ringo.FF.st ) 
   
 $socket_type=SOCK_STREAM;
@@ -296,14 +295,14 @@ function gen_create_query($prefix, $name) {
 }
 
 function proto_welcome(&$socket) {
-	global $home_dir,$servername;
+	global $servername;
 	if (!$socket['mysql']) {
 		swrite($socket, '400 Sorry, no database backend available for now. Please retry later.');
 		sleep(2);
 		sclose($socket);
 		exit;
 	}
-	$socket["log_fp"]=fopen($home_dir."log/smtp-".date("Ymd-His")."-".$socket["remote_ip"].".log","w");
+	$socket["log_fp"]=fopen(HOME_DIR."log/smtp-".date("Ymd-His")."-".$socket["remote_ip"].".log","w");
 	fputs($socket["log_fp"],"Client : ".$socket["remote_ip"].":".$socket["remote_port"]." connected.\r\n");
 	swrite($socket,"220 $servername ESMTP (phpMaild v1.1 by MagicalTux <MagicalTux@gmail.com>) ready.");
 }

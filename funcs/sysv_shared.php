@@ -1,5 +1,12 @@
-<?
-// system for communications
+<?php
+/* SysV Sharedmemory-based inter-process communication module
+ * $Id$
+ * 
+ * This module manages the communication between forked processes using shared segments
+ * of memory. When a segment is changed, a signal is sent to the target process to let
+ * it know something happened.
+ */
+
 define("DATA_PID",1);
 define("DATA_REHASH",2);
 define("DATA_SHUTDOWN",3);
@@ -7,12 +14,12 @@ define("DATA_DAEMONS",4);
 
 $main_shared_mem=false;
 $shared_mem=false;
-$fil=@fopen($home_dir.$pidfile,"r");
+$fil=@fopen(HOME_DIR.$pidfile,"r");
 if ($fil) {
 	$pid=fgets($fil,100);
 	fclose($fil);
 	if (!posix_kill($pid,0)) {
-		unlink($home_dir.$pidfile);
+		unlink(HOME_DIR.$pidfile);
 		unset($pid);
 	} else {
 		$shared_mem = shm_attach($pid,10000,0666);
@@ -35,8 +42,8 @@ if ($fil) {
 
 function comm_child_channel() {
 	// makes a child channel
-	global $shared_mem,$home_dir,$pidfile;
-	$fil=@fopen($home_dir.$pidfile,"r");
+	global $shared_mem,$pidfile;
+	$fil=@fopen(HOME_DIR.$pidfile,"r");
 	if ($fil) {
 		$pid=fgets($fil,100);
 		fclose($fil);
@@ -47,7 +54,7 @@ function comm_child_channel() {
 }
 
 function comm_free() {
-	// libère le canal de communication
+	// free the communication channel
 	global $shared_mem;
 	if (shm_get_var($shared_mem,DATA_PID)==posix_getpid()) {
 		global $main_shared_mem;

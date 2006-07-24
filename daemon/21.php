@@ -6,7 +6,6 @@
 // vars :
 // $current_socket : socket en cours
 // $mysql_cnx : connexion MySQL
-// $home_dir : rép home (fini par / )
 // $servername : nom du serv (eg. Ringo.FF.st ) 
 
 $socket_type=SOCK_STREAM;
@@ -47,14 +46,14 @@ function proto_check(&$socket,$clients) {
 }
 
 function proto_welcome(&$socket) {
-	global $home_dir,$max_users;
-	$socket["log_fp"]=fopen($home_dir."log/ftp-".date("Ymd-His")."-".$socket["remote_ip"].".log","w");
+	global $max_users;
+	$socket["log_fp"]=fopen(HOME_DIR."log/ftp-".date("Ymd-His")."-".$socket["remote_ip"].".log","w");
 	fputs($socket["log_fp"],"Client : ".$socket["remote_ip"].":".$socket["remote_port"]." connected.\r\n");
 	swrite($socket,"220-Looking up your hostname...");
 }
 
 function proto_welcome2(&$socket) {
-	global $home_dir,$max_users,$locarray;
+	global $max_users,$locarray;
 	$locale="en";
 	$lng = substr($socket["remote_host"],-3); // 3 last
 	if (substr($lng,0,1)!=".") $lng="en";

@@ -1,32 +1,31 @@
 <?php
 // pmaild v2.0
-  // POP3 server rewrote from scratch (missing old sourcecode)
-  // vars :
-  // $current_socket : socket en cours
-  // $mysql_cnx : connexion MySQL
-  // $home_dir : r�p home (fini par / )
-  // $servername : nom du serv (eg. Ringo.FF.st ) 
-  
-  // http://www.faqs.org/rfcs/rfc1939.html
+// POP3 server rewrote from scratch (missing old sourcecode)
+// vars :
+// $current_socket : socket en cours
+// $mysql_cnx : connexion MySQL
+// $servername : nom du serv (eg. Ringo.FF.st ) 
 
-  $socket_type=SOCK_STREAM;
-  $socket_proto=SOL_TCP;
-  $connect_error="-ERR Please try again later";
-  $unknown_command="-ERR Command unrecognized";
-  
-  $srv_info=array();
-  $srv_info["name"]="POP3 Server v2.0 (pmaild v2.0 by MagicalTux <magicaltux@gmail.com>)";
-  $srv_info["version"]="2.0.0";
+// http://www.faqs.org/rfcs/rfc1939.html
+
+$socket_type=SOCK_STREAM;
+$socket_proto=SOL_TCP;
+$connect_error="-ERR Please try again later";
+$unknown_command="-ERR Command unrecognized";
+
+$srv_info=array();
+$srv_info["name"]="POP3 Server v2.0 (pmaild v2.0 by MagicalTux <magicaltux@gmail.com>)";
+$srv_info["version"]="2.0.0";
 
 function proto_welcome(&$socket) {
-	global $home_dir,$servername;
+	global $servername;
 	if (!$socket['mysql']) {
 		swrite($socket, '-ERR No database backend available. Please retry later.');
 		sleep(2);
 		sclose($socket);
 		exit;
 	}
-	$socket["log_fp"]=fopen($home_dir."log/pop3-".date("Ymd-His")."-".$socket["remote_ip"].'-'.getmypid().".log","w");
+	$socket["log_fp"]=fopen(HOME_DIR."log/pop3-".date("Ymd-His")."-".$socket["remote_ip"].'-'.getmypid().".log","w");
 	fputs($socket["log_fp"],"Client : ".$socket["remote_ip"].":".$socket["remote_port"]." connected.\r\n");
 	swrite($socket,"+OK $servername POP3 server (phpMaild v1.1 by MagicalTux <magicaltux@gmail.com>) ready.");
 }

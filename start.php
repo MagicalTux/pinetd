@@ -2,15 +2,18 @@
 <?php
 
 echo "Loading phpInetd v1.0 ...\n";
-if (!file_exists("config.php")) {
+if (!defined('HOME_DIR')) define('HOME_DIR', dirname(__FILE__).'/');
+
+if (!file_exists(HOME_DIR.'config.php')) {
 	echo "Error : please configure before running.\n";
 	exit;
 }
+
 set_time_limit(0);
-require("config.php");
-chdir($home_dir);
-set_time_limit(0);
+require(HOME_DIR."config.php");
+chdir(HOME_DIR);
 if (posix_getuid() != 0) die("This program must be started as root and not ".posix_getlogin().".\n");
+
 $fil = @fopen($pidfile,"r");
 if ($fil) {
 	$oldpid=fgets($fil,25);
@@ -41,7 +44,7 @@ sleep(2);
 
 // we're child
 logstr("Main child init. Loading server childs...");
-chdir($home_dir);
+chdir(HOME_DIR);
 $dir=@opendir("daemon");
 if (!$dir) { logstr("Error while reading daemon directory. Aborting..."); exit(); }
 $daemons=array();
@@ -144,13 +147,13 @@ while (is_null($server_port)) {
 			}
 		}
 		comm_free();
-		unlink($home_dir.$pidfile);
+		unlink(HOME_DIR.$pidfile);
 		exit;
 	}
 	if (comm_check_reload()) {
 		logstr("Trying to reload config file...");
 		comm_clear_reload();
-		chdir($home_dir);
+		chdir(HOME_DIR);
 		if (!file_exists("config.php")) {
 			logstr("Error : configuration file not found !");
 		} else {
@@ -277,7 +280,7 @@ if (is_numeric($server_port)) {
 		}
 		if (comm_check_reload()) {
 			comm_clear_reload($server_port);
-			chdir($home_dir);
+			chdir(HOME_DIR);
 			if (file_exists("config.php")) require("config.php");
 			if (function_exists('func_reload')) func_reload();
 		}
@@ -308,7 +311,7 @@ while(!$client) { // mit sur true si le thread est forké et deviens un thread cl
 	if (comm_check_reload()) {
 		comm_clear_reload($server_port);
 		logstr("Reloading server config...");
-		chdir($home_dir);
+		chdir(HOME_DIR);
 		if (file_exists("config.php")) require("config.php");
 	}
 	foreach($clients as $pid=>&$data) {

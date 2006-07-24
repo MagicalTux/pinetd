@@ -62,8 +62,8 @@ $srv_info["name"]="IMAP4rev1 Server v2.0 (pmaild v2.0 by MagicalTux <magicaltux@
 $srv_info["version"]="2.0.0";
 
 function proto_welcome(&$socket) {
-	global $home_dir,$servername;
-	$socket["log_fp"]=fopen($home_dir."log/imap4-".date("Ymd-His")."-".$socket["remote_ip"].'-'.getmypid().".log","w");
+	global $servername;
+	$socket["log_fp"]=fopen(HOME_DIR."log/imap4-".date("Ymd-His")."-".$socket["remote_ip"].'-'.getmypid().".log","w");
 	fputs($socket["log_fp"],"Client : ".$socket["remote_ip"].":".$socket["remote_port"]." connected.\r\n");
 	$socket['namespace'] = 'pcmd';
 	swrite($socket,'* OK [CAPABILITY IMAP4REV1 X-NETSCAPE LOGIN-REFERRALS AUTH=LOGIN] '.$servername.' IMAP4rev1 2001.305/pMaild at '.date(DATE_RFC2822));
