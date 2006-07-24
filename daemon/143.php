@@ -126,7 +126,7 @@ function pcmd_login(&$socket,$cmdline, $id) {
   	if ($pos===false) $pos=strrpos($login,'+');
   	$domain=substr($login,$pos+1);
   	$login =substr($login,0,$pos);
-  	$req='SELECT domainid, state, protocol FROM `phpinetd-maild`.`domains` WHERE domain = \''.mysql_escape_string($domain).'\'';
+  	$req='SELECT domainid, state, protocol FROM `'.PHPMAILD_DB_NAME.'`.`domains` WHERE domain = \''.mysql_escape_string($domain).'\'';
   	$res=@mysql_query($req);
   	$res=@mysql_fetch_assoc($res);
   	if (!$res) {
@@ -146,7 +146,7 @@ function pcmd_login(&$socket,$cmdline, $id) {
   		return;
   	}
   	$did=$res['domainid'];
-  	$p='`phpinetd-maild`.`z'.$did.'_';
+  	$p='`'.PHPMAILD_DB_NAME.'`.`z'.$did.'_';
   	$req='SELECT id, password FROM '.$p.'accounts` WHERE user=\''.mysql_escape_string($login).'\'';
   	$res=@mysql_query($req);
   	$res=@mysql_fetch_assoc($res);
@@ -175,11 +175,11 @@ function pcmd_login(&$socket,$cmdline, $id) {
 	$req = 'UPDATE '.$p.'accounts` SET `last_login`=NOW() WHERE id=\''.mysql_escape_string($res['id']).'\'';
 	@mysql_query($req);
 	// Insert IP to allow usage of MTA
-	$req = 'REPLACE INTO `phpinetd-maild`.`hosts` SET `ip`=\''.mysql_escape_string($socket['remote_ip']).'\', ';
+	$req = 'REPLACE INTO `'.PHPMAILD_DB_NAME.'`.`hosts` SET `ip`=\''.mysql_escape_string($socket['remote_ip']).'\', ';
 	$req.= '`type` = \'trust\', `regdate` = NOW(), `expires` = DATE_ADD(NOW(), INTERVAL 2 HOUR), ';
 	$req.= '`user_email` = \''.mysql_escape_string($login.'@'.$domain).'\'';
 	@mysql_query($req);
-	$req = 'DELETE FROM `phpinetd-maild`.`hosts` WHERE `expires` < NOW()';
+	$req = 'DELETE FROM `'.PHPMAILD_DB_NAME.'`.`hosts` WHERE `expires` < NOW()';
 	@mysql_query($req);
   	$path=$path=PHPMAILD_STORAGE.'/domains';
   	$path.='/'.substr($did,-1).'/'.substr($did,-2).'/'.$did;

@@ -15,8 +15,6 @@ $srv_info=array();
 $srv_info["name"]="ESMTP Server v2.0 (pmaild v2.0 by MagicalTux <MagicalTux@gmail.com>)";
 $srv_info["version"]="2.0.0";
 
-define('MYSQL_DB_NAME','phpinetd-maild');
-
 $tables_struct = array(
 	'%s_accounts' => array(
 		'id' => array(
@@ -210,7 +208,7 @@ function struct_check_tables($prefix) {
 	foreach($tables_struct as $table_name_o=>$struct) {
 		$table_name = sprintf($table_name_o, $prefix);
 		$f = array_flip(array_keys($struct)); // field list
-		$req = 'SHOW FIELDS FROM `'.MYSQL_DB_NAME.'`.`'.$table_name.'`';
+		$req = 'SHOW FIELDS FROM `'.PHPMAILD_DB_NAME.'`.`'.$table_name.'`';
 		$res = @mysql_query($req);
 		if (!$res) {
 			$req = gen_create_query($prefix, $table_name_o);
@@ -220,19 +218,19 @@ function struct_check_tables($prefix) {
 		while($row = mysql_fetch_assoc($res)) {
 			if (!isset($f[$row['Field']])) {
 				// we got a field we don't know about
-				$req = 'ALTER TABLE `'.MYSQL_DB_NAME.'`.`'.$table_name.'` DROP `'.$row['Field'].'`';
+				$req = 'ALTER TABLE `'.PHPMAILD_DB_NAME.'`.`'.$table_name.'` DROP `'.$row['Field'].'`';
 				@mysql_query($req);
 				continue;
 			}
 			unset($f[$row['Field']]);
 			$col = $struct[$row['Field']];
 			if ($row['Type']!=col_gen_type($col)) {
-				$req = 'ALTER TABLE `'.MYSQL_DB_NAME.'`.`'.$table_name.'` CHANGE `'.$row['Field'].'` '.gen_field_info($row['Field'], $col);
+				$req = 'ALTER TABLE `'.PHPMAILD_DB_NAME.'`.`'.$table_name.'` CHANGE `'.$row['Field'].'` '.gen_field_info($row['Field'], $col);
 				@mysql_query($req);
 			}
 		}
 		foreach($f as $k=>$ign) {
-			$req = 'ALTER TABLE `'.MYSQL_DB_NAME.'`.`'.$table_name.'` ADD '.gen_field_info($k, $struct[$k]);
+			$req = 'ALTER TABLE `'.PHPMAILD_DB_NAME.'`.`'.$table_name.'` ADD '.gen_field_info($k, $struct[$k]);
 			@mysql_query($req);
 		}
 	}
@@ -290,7 +288,7 @@ function gen_create_query($prefix, $name) {
 		}
 		$req.=($req==''?'':', ').$tmp;
 	}
-	$req = 'CREATE TABLE `'.MYSQL_DB_NAME.'`.`'.$name.'` ('.$req.') ENGINE=MyISAM DEFAULT CHARSET=latin1';
+	$req = 'CREATE TABLE `'.PHPMAILD_DB_NAME.'`.`'.$name.'` ('.$req.') ENGINE=MyISAM DEFAULT CHARSET=latin1';
 	return $req;
 }
 
@@ -390,7 +388,7 @@ function resolve_email(&$socket,$addr) {
 	if ($pos===false) return NULL;
 	$user = substr($addr,0,$pos);
 	$domain=substr($addr,$pos+1);
-	$req='SELECT domainid, defaultuser, state, flags, antispam, antivirus FROM `'.MYSQL_DB_NAME.'`.`domains` WHERE domain=\''.mysql_escape_string($domain).'\'';
+	$req='SELECT domainid, defaultuser, state, flags, antispam, antivirus FROM `'.PHPMAILD_DB_NAME.'`.`domains` WHERE domain=\''.mysql_escape_string($domain).'\'';
 	$res=@mysql_query($req);
 	$res=@mysql_fetch_assoc($res);
 	if (!$res) return '550 Relaying denied for this domain';
@@ -405,7 +403,7 @@ function resolve_email(&$socket,$addr) {
 	$res['flags']=explode(',',$res['flags']);
 	if ($res['state']=='new') {
 		struct_check_tables('z'.$res['domainid']);
-		$req='UPDATE `'.MYSQL_DB_NAME.'`.`domains` SET state=\'active\' WHERE domainid=\''.mysql_escape_string($res['domainid']).'\'';
+		$req='UPDATE `'.PHPMAILD_DB_NAME.'`.`domains` SET state=\'active\' WHERE domainid=\''.mysql_escape_string($res['domainid']).'\'';
 		@mysql_query($req);
 	} else {
 		struct_check_tables('z'.$res['domainid']);
@@ -413,7 +411,7 @@ function resolve_email(&$socket,$addr) {
 
 	$domain_data=$res;
 	// table prefix
-	$p='`'.MYSQL_DB_NAME.'`.`z'.$res['domainid'].'_';
+	$p='`'.PHPMAILD_DB_NAME.'`.`z'.$res['domainid'].'_';
 	// check for account
 	$req='SELECT id FROM '.$p.'accounts` WHERE user=\''.mysql_escape_string($user).'\'';
 	$res=@mysql_query($req);
@@ -453,7 +451,7 @@ function resolve_email(&$socket,$addr) {
 		'email'=>$user.'@'.$domain,
 		'headers'=>'Delivered-To: <'.$user.'@'.$domain.'>'."\r\n",
 	);
-	$req = 'UPDATE `'.MYSQL_DB_NAME.'`.`domains` SET `last_recv`=NOW() WHERE `domainid` = \''.mysql_escape_string($domain_data['domainid']).'\'';
+	$req = 'UPDATE `'.PHPMAILD_DB_NAME.'`.`domains` SET `last_recv`=NOW() WHERE `domainid` = \''.mysql_escape_string($domain_data['domainid']).'\'';
 	@mysql_query($req);
 	$socket['antispam']=$domain_antispam;
 	return $res;
@@ -567,7 +565,7 @@ function pcmd_data(&$socket,$cmdline) {
 				fwrite($out,$data['headers']);
 				fseek($wrmail,0);
 				stream_copy_to_stream($wrmail,$out);
-				$p='`phpinetd-maild`.`z'.$data['domain'].'_';
+				$p='`'.PHPMAILD_DB_NAME.'`.`z'.$data['domain'].'_';
 				$req='INSERT INTO '.$p.'mails` SET folder=0, userid=\''.mysql_escape_string($data['account']).'\', ';
 				$req.='uniqname=\''.mysql_escape_string(basename($target)).'\'';
 				@mysql_query($req);

@@ -24,5 +24,5 @@ $ftp_owner_g="nogroup";
 // phpmaild specific
 define('PHPMAILD_STORAGE','/var/spool/phpmaild');
 define('PHPMAILD_DEFAULT_DOMAIN','example.com');
-
+define('PHPMAILD_DB_NAME','phpinetd-maild');
 
