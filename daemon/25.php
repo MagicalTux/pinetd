@@ -653,7 +653,9 @@ function run_antivirus(&$socket, $filename, $av) {
 
 function run_as_spamassassin(&$socket, $filename, $fh) {
 	$out=make_uniq('tmp');
-	$cmd='/usr/bin/spamassassin '.escapeshellarg($filename).' >'.escapeshellarg($out);
+	$cmd='/usr/bin/spamassassin';
+	if (!is_executable('/usr/bin/spamc')) $cmd='/usr/bin/spamc';
+	$cmd.=' '.escapeshellarg($filename).' >'.escapeshellarg($out);
 	$res=system($cmd,$rc);
 	if (filesize($out)<50) {
 		swrite($socket,'400 Problem while running spamassassin...');
