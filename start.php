@@ -391,10 +391,10 @@ while(1) {
 		$pos=strpos($dat," ");
 		if (!$pos) $pos=strlen($dat);
 		$cmd=substr($dat,0,$pos);
-		$cmd=strtolower($cmd);
 		if (function_exists("proto_handler")) {
 			proto_handler($socket,$cmd,$dat);
 		} else {
+			$cmd=strtolower($cmd);
 			if (function_exists("pcmd_".$cmd)) {
 				$cmd="pcmd_".$cmd;
 				$cmd($socket,$dat);
