@@ -196,6 +196,7 @@ function pcmd_pass(&$socket,$cmdline) {
   		'userid'=>$res['id'],
   		'path'=>$path,
   		'lock'=>$lock,
+		'locked'=>$fil,
   	);
   	$socket['dele']=array();
   	$socket['local_num']=array();
