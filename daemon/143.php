@@ -107,7 +107,7 @@ function ucmd_namespace(&$socket, $cmdline, $id) {
 	// * NAMESPACE (("" "/")("#mhinbox" NIL)("#mh/" "/")) (("~" "/")) (("#shared/" "/")("#ftp/" "/")("#news." ".")("#public/" "/"))
 //	A OK NAMESPACE completed
 	// TODO: find some documentation and adapt this function
-	write($socket, '* NAMESPACE (("" "/")("#mhinbox" NIL)("#mh/" "/")) (("~" "/")) (("#shared/" "/")("#ftp/" "/")("#news." ".")("#public/" "/"))');
+	swrite($socket, '* NAMESPACE (("" "/")("#mhinbox" NIL)("#mh/" "/")) (("~" "/")) (("#shared/" "/")("#ftp/" "/")("#news." ".")("#public/" "/"))');
 	swrite($socket, $id.' OK NAMESPACE completed');
 }
 
