@@ -6,8 +6,7 @@
 // $mysql_cnx : connexion MySQL
 // $servername : nom du serv (eg. Ringo.FF.st ) 
   
-$socket_type=SOCK_STREAM;
-$socket_proto=SOL_TCP;
+if (!defined('PINETD_SOCKET_TYPE')) define('PINETD_SOCKET_TYPE', 'tcp');
 $connect_error="420 Please try again later";
 $unknown_command="500 Command unrecognized";
   
@@ -352,6 +351,7 @@ function pcmd_helo(&$socket,$cmdline,$oldprot=true) {
 			swrite($socket,'250-'.$servername.' Pleased to meet you, '.$remote.'.');
 			swrite($socket,'250-PIPELINING');
 			swrite($socket,'250-ETRN');
+			if (function_exists('stream_socket_enable_crypto')) swrite($socket,'250-STARTTLS');
 			swrite($socket,"250 8BITMIME");
 		}
 	}
@@ -360,6 +360,22 @@ function pcmd_helo(&$socket,$cmdline,$oldprot=true) {
 function pcmd_help(&$socket,$cmdline) {
 	// help system...
 	swrite($socket,'214 http://wiki.ooKoo.org/wiki/pinetd');
+}
+
+function pcmd_starttls(&$socket, $cmdline) {
+	if (!function_exists('stream_socket_enable_crypto')) {
+		swrite($socket, '454 TLS not available. You need PHP 5 >= 5.1.0RC1 with OpenSSL module');
+		return;
+	}
+	swrite($socket, '220 Ready to start TLS');
+	$res = 0;
+	while($res===0)
+		$res = stream_socket_enable_crypto($socket['sock'], true, STREAM_CRYPTO_METHOD_TLS_SERVER);
+	if ($res===false) {
+		sclose($socket);
+		sleep(2);
+		exit;
+	}
 }
 
 function pcmd_mail(&$socket,$cmdline) {

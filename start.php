@@ -290,8 +290,7 @@ if (is_numeric($server_port)) {
 		main_loop();
 	}
 }
-$master_socket=socket_init($socket_type,$socket_proto,$server_port,$bind_ip);
-socket_set_nonblock($master_socket);
+$master_socket=socket_init(PINETD_SOCKET_TYPE, $server_port,$bind_ip);
 // notre socket est prêt ! :p
 $client=false;
 $socket=false;
@@ -301,13 +300,13 @@ while(!$client) { // mit sur true si le thread est forké et deviens un thread cl
 	$r = array($master_socket);
 	$e = $r;
 	$w = NULL;
-	if ( @socket_select($r, $w, $e, 2) > 0) {
-		$socket=socket_accept($master_socket);
+	if ( @stream_select($r, $w, $e, 2) > 0) {
+		$socket=stream_socket_accept($master_socket, 0, $addr);
 	}
 	if (comm_check_shutdown()) {
 		comm_clear_shutdown($server_port);
 		logstr("Closing server $server_port [".posix_getpid()."] : requested.");
-		socket_close($master_socket);
+		fclose($master_socket);
 		comm_free();
 		exit;
 	}
@@ -341,7 +340,8 @@ while(!$client) { // mit sur true si le thread est forké et deviens un thread cl
 		$socket=array();
 		$socket["sock"]=$new;
 		unset($new);
-		socket_getpeername($socket["sock"],$addr,$port);
+		// $addr = 127.0.0.1:39161
+		list($addr, $port) = explode(':', $addr);
 		$socket["remote_ip"]=$addr;
 		$socket["remote_port"]=$port;
 		$socket["state"]=true;
@@ -368,7 +368,7 @@ while(!$client) { // mit sur true si le thread est forké et deviens un thread cl
 		}
 	}
 }
-socket_close($master_socket);
+fclose($master_socket);
 $mysql_cnx=getsql();
 $socket['mysql'] = $mysql_cnx;
 proto_welcome($socket);
@@ -379,7 +379,7 @@ if (isset($socket["log_fp"])) {
 if (function_exists("proto_welcome2")) proto_welcome2($socket);
 while(1) {
 	if (isset($socket_timeout)) {
-		$num=@socket_select($r=array($socket["sock"]),$w=NULL,$e=NULL,$socket_timeout);
+		$num=@stream_select($r=array($socket["sock"]),$w=NULL,$e=NULL,$socket_timeout);
 		if (!$num) {
 			if (function_exists("proto_timeout")) proto_timeout($socket);
 			sclose($socket);

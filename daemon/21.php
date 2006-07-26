@@ -8,8 +8,7 @@
 // $mysql_cnx : connexion MySQL
 // $servername : nom du serv (eg. Ringo.FF.st ) 
 
-$socket_type=SOCK_STREAM;
-$socket_proto=SOL_TCP;
+if (!defined('PINETD_SOCKET_TYPE')) define('PINETD_SOCKET_TYPE', 'tcp');
 $connect_error="500 Server not ready";
 $unknown_command="500 Wakari-masen";
 $socket_timeout=300; // 5 min
@@ -333,32 +332,36 @@ function pcmd_port(&$socket,$cmdline) {
 
 function pcmd_pasv(&$socket,$cmdline) {
 	// passive mode
-global $pasv_ip;
+	global $pasv_ip;
 	$myip="";
 	socket_getsockname($socket["sock"],$myip);
+	$myip = stream_socket_get_name($socket['sock'], false);
+	list($myip, $myport) = explode(':', $myip);
+
 	$sock=@socket_create (AF_INET, SOCK_STREAM, SOL_TCP);
 	if (!$sock) {
 		swrite($socket,"500 Couldn't create socket : ".socket_strerror($sock));
 		return false;
 	}
-	// bind to a port near 40000 - 41000
+	// bind to a random port, thanks to socket_bind
 	if (!@socket_bind($sock,$myip)) {
-	swrite($socket,"500 Couldn't bind socket");
-	socket_close($sock);
-	return false;
-}
+		swrite($socket,"500 Couldn't bind socket");
+		socket_close($sock);
+		return false;
+	}
 	$res=socket_listen($sock,5);
 	if (!$res) {
 		socket_close($sock);
 		swrite($socket,"500 Couldn't set socket listning : ".socket_strerror($res));
 		return false;
 	}
+
 	$socket["mode"]=-1;
 	$socket["mode_sock"]=$sock;
 	socket_getsockname($sock,$myip,$myport);
 	$myport2=( $myport >> 8 ) & 0xFF;
 	$myport=($myport & 0xFF);
-if (trim($pasv_ip)!="") $myip=$pasv_ip;
+	if (trim($pasv_ip)!="") $myip=$pasv_ip;
 	$res="227 Entering passive mode (".str_replace(".",",",$myip).",".$myport2.",".$myport.")";
 	swrite($socket,$res);
 }

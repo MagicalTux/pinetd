@@ -8,8 +8,7 @@
 
 // http://www.faqs.org/rfcs/rfc1939.html
 
-$socket_type=SOCK_STREAM;
-$socket_proto=SOL_TCP;
+if (!defined('PINETD_SOCKET_TYPE')) define('PINETD_SOCKET_TYPE', 'tcp');
 $connect_error="-ERR Please try again later";
 $unknown_command="-ERR Command unrecognized";
 

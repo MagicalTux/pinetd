@@ -49,8 +49,7 @@
 *              +-------------------------------+
 */
 
-$socket_type=SOCK_STREAM;
-$socket_proto=SOL_TCP;
+if (!defined('PINETD_SOCKET_TYPE')) define('PINETD_SOCKET_TYPE', 'tcp');
 $connect_error="-ERR Please try again later";
 $unknown_command="-ERR Command unrecognized";
 $socket_timeout=1800; // 30 min (as per RFC)
@@ -61,12 +60,50 @@ $srv_info=array();
 $srv_info["name"]="IMAP4rev1 Server v2.0 (pmaild v2.0 by MagicalTux <magicaltux@gmail.com>)";
 $srv_info["version"]="2.0.0";
 
+function parse_imap_argv($string) {
+	$res = array();
+	$isin = $isin2 = 0;
+	$j=-1;
+	$len = strlen($string);
+	for($i=0;$i<$len;$i++) {
+		$c=$string{$i};
+		if ((!$isin2) && ($c == '"')) {
+			$isin=1-$isin;
+			if ($isin) {
+				$j++;
+				$res[$j]='';
+			}
+			continue;
+		}
+		if ($isin) {
+			if ($c=='\\') if (($string{$i+1}=='"') || ($string{$i+1}=='\\')) { $i++; $c=$string{$i}; }
+			$res[$j] .= $c;
+		} else {
+			if (($c != " ") && ($c != "\t")) {
+				if (!$isin2) {
+					$j++;
+					$isin2=1;
+				}
+				$res[$j].=$c;
+			} else {
+				if ($isin2) $isin2=0;
+			}
+		}
+	}
+	return $res;
+}
+
 function proto_welcome(&$socket) {
 	global $servername;
+	if (!function_exists('mb_convert_encoding')) {
+		swrite($socket, '* NO mb_string extension missing in installation, IMAP not working');
+		return;
+	}
 	$socket["log_fp"]=fopen(HOME_DIR."log/imap4-".date("Ymd-His")."-".$socket["remote_ip"].'-'.getmypid().".log","w");
 	fputs($socket["log_fp"],"Client : ".$socket["remote_ip"].":".$socket["remote_port"]." connected.\r\n");
 	$socket['namespace'] = 'pcmd';
 	swrite($socket,'* OK [CAPABILITY IMAP4REV1 X-NETSCAPE LOGIN-REFERRALS AUTH=LOGIN] '.$servername.' IMAP4rev1 2001.305/pMaild at '.date(DATE_RFC2822));
+	mysql_query('SET NAMES utf8');
 }
 
 function proto_handler(&$socket, $id, $dat) {
@@ -109,6 +146,45 @@ function ucmd_namespace(&$socket, $cmdline, $id) {
 	// TODO: find some documentation and adapt this function
 	swrite($socket, '* NAMESPACE (("" "/")("#mhinbox" NIL)("#mh/" "/")) (("~" "/")) (("#shared/" "/")("#ftp/" "/")("#news." ".")("#public/" "/"))');
 	swrite($socket, $id.' OK NAMESPACE completed');
+}
+
+function ucmd_lsub(&$socket, $cmdline, $id) {
+	// LSUB "" "*"
+/*
+* LSUB () "/" INBOX
+* LSUB () "/" "INBOX/FSLT & HL"
+* LSUB () "/" INBOX/drafts
+* LSUB () "/" INBOX/sent-mail
+* LSUB () "/" "&AMk-l&AOk-ments envoy&AOk-s"
+* LSUB () "/" Brouillons
+B OK LSUB completed
+*/
+	$arg = parse_imap_argv($cmdline);
+	$namespace = $arg[0];
+	$param = $arg[1];
+	if ($namespace=='') $namespace='/';
+	if ($namespace!='/') {
+		swrite($socket, $id.' NO Unknown namespace');
+		return;
+	}
+	swrite($socket, '* LSUB () "/" INBOX'); // "root" box - reserved name
+	$p = $socket['userinfo']['prefix'];
+	$req = 'SELECT id, name, parent FROM '.$p.'folders` WHERE account=\''.mysql_escape_string($socket['userinfo']['userid']).'\' ';
+	$req.= 'ORDER BY parent ASC';
+	$cache = array(0=>'INBOX');
+	$res = @mysql_query($req);
+	while($resu = mysql_fetch_row($res)) {
+		$name = $resu[1];
+		$name = mb_convert_encoding($name, 'UTF7-IMAP', 'UTF-8'); // convert UTF-8 -> modified UTF-7
+		if ($resu[2]!=-1) { // non-root
+			if (!isset($cache[$resu[2]])) continue; // bogus:inexisting parent
+			$name = $cache[$resu[2]].'/'.$name;
+		}
+		$cache[$resu[0]] = $name;
+		if ( (addslashes($name)!=$name) || (strpos($name, ' ')!==false))
+			$name='"'.addslashes($name).'"';
+		swrite($socket, '* LSUB () "/" '.$name);
+	}
 }
 
 function pcmd_quit(&$socket,$cmdline, $id) {
