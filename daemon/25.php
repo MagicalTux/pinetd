@@ -295,7 +295,6 @@ function proto_welcome(&$socket) {
 	global $servername;
 	if (!$socket['mysql']) {
 		swrite($socket, '400 Sorry, no database backend available for now. Please retry later.');
-		sleep(2);
 		sclose($socket);
 		exit;
 	}
@@ -376,7 +375,6 @@ function pcmd_starttls(&$socket, $cmdline) {
 		$res = stream_socket_enable_crypto($socket['sock'], true, STREAM_CRYPTO_METHOD_TLS_SERVER);
 	if ($res===false) {
 		sclose($socket);
-		sleep(2);
 		exit;
 	}
 }

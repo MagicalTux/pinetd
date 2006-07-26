@@ -183,7 +183,6 @@ function pcmd_logout(&$socket,$cmdline, $id) {
 	global $servername;
 	swrite($socket,'* BYE '.$servername.' IMAP4rev1 server says bye !');
 	swrite($socket,$id.' OK LOGOUT completed');
-	sleep(2);
 	sclose($socket);
 	exit;
 }
@@ -191,7 +190,6 @@ function ucmd_logout(&$socket,$cmdline, $id) {
 	global $servername;
 	swrite($socket,'* BYE '.$servername.' IMAP4rev1 server says bye !');
 	swrite($socket,$id.' OK LOGOUT completed');
-	sleep(2);
 	sclose($socket);
 	exit;
 }

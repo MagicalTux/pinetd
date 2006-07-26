@@ -20,7 +20,6 @@ function proto_welcome(&$socket) {
 	global $servername;
 	if (!$socket['mysql']) {
 		swrite($socket, '-ERR No database backend available. Please retry later.');
-		sleep(2);
 		sclose($socket);
 		exit;
 	}
@@ -47,7 +46,6 @@ function pcmd_quit(&$socket,$cmdline) {
 		}
 	}
 	swrite($socket,"+OK Ja mata !");
-	sleep(2);
 	sclose($socket);
 	exit;
 }

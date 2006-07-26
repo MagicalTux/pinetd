@@ -91,7 +91,6 @@ function proto_handler(&$socket,$cmd,$cmdline) {
 
 function pcmd_quit(&$socket,$cmdline) {
 	swrite($socket,"221 Ja mata !");
-	sleep(2);
 	sclose($socket);
 	exit;
 }
