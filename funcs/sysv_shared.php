@@ -144,8 +144,8 @@ function comm_update_info($port, $type, $c_count) {
 	global $shared_mem,$sysv_sem;
 	sem_acquire($sysv_sem);
 	$data = shm_get_var($shared_mem,DATA_DAEMONS);
-	$data['type'] = $type;
-	$data['c_count'] = $c_count;
+	$data[$port]['type'] = $type;
+	$data[$port]['c_count'] = $c_count;
 	@shm_remove_var($shared_mem,DATA_DAEMONS);
 	shm_put_var($shared_mem,DATA_DAEMONS, $data);
 	sem_release($sysv_sem);

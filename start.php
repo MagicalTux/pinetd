@@ -100,6 +100,7 @@ while (is_null($server_port)) {
 	// as long as we don't fork
 	sleep(1); // idle time : 1sec
 	$info=array();
+	$info2=comm_import(DATA_DAEMONS);
 	foreach($daemons as $port=>$pid) {
 		$pid2=$pid;
 		if ($pid>0) {
@@ -116,7 +117,7 @@ while (is_null($server_port)) {
 				logstr("Child port $port [$pid] dead. Sheduling restart to time + $wait");
 			}
 		}
-		$pinfo=array();
+		$pinfo=$info2[$port];
 		$pinfo["pid"]=$pid2;
 		$pinfo["up"]=($pid>0);
 		$info[$port]=$pinfo;
