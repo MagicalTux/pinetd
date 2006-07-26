@@ -338,6 +338,7 @@ while(!$client) { // mit sur true si le thread est forké et deviens un thread cl
 		}
 	}
 	if ($socket) {
+		stream_set_write_buffer($socket, 0); // unbuffered stream
 		$new=$socket;
 		$socket=array();
 		$socket["sock"]=$new;
