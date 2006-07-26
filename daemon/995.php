@@ -7,6 +7,7 @@
  */
 
 if (!extension_loaded('openssl')) exit(180); // need SSL extension
+if (!isset($ssl_settings[$server_port])) exit(180); // need SSL settings
 
 if (!defined('PINETD_SOCKET_TYPE')) define('PINETD_SOCKET_TYPE', 'ssl');
 

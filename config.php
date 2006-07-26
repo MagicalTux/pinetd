@@ -45,6 +45,17 @@ $ssl_settings = array(
 			'CN_match' => '', // Common Name of certificate
 		),
 	),
+	995=>array( // POP3S
+		'ssl'=>array(
+			'verify_peer' => false, // Verify peer certificate?
+			'allow_self_signed' => true,
+			'local_cert' => HOME_DIR.'ssl/newkey.pem',
+			'cafile' => HOME_DIR.'ssl/newkey.pem',
+//			'passphrase' => '', // passphrase for certificate
+		),
+	),
+		),
+	),
 );
 
 
