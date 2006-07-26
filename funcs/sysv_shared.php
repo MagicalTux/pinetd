@@ -59,6 +59,7 @@ function comm_free() {
 		sem_acquire($sysv_sem);
 		shm_detach($shared_mem);
 		shm_remove($main_shared_mem);
+		sem_release($sysv_sem);
 		sem_remove($sysv_sem);
 	} else {
 		shm_detach($shared_mem);
