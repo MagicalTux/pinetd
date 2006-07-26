@@ -48,7 +48,7 @@ function swrite(&$socket,$str,$send=false) {
 	$str.="\r\n";
 	if (!$send) {
 		$dat=0;
-		while ($dat != strlen($str)) {
+		while (strlen($str)>0) {
 			$dat=@fwrite($socket["sock"],$str);
 			if (($dat === FALSE) || ($dat===0)) {
 				$socket["state"]=false; // my socket is broken
