@@ -306,8 +306,7 @@ function proto_welcome(&$socket) {
 
 function pcmd_quit(&$socket,$cmdline) {
 	global $servername;
-	swrite($socket,'221 '.$servername.' closing control connexion. Mata ne~ !',true);
-	sleep(2); // make sure buffer is flushed
+	swrite($socket,'221 '.$servername.' closing control connexion. Mata ne~ !');
 	sclose($socket);
 	exit;
 }
