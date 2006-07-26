@@ -101,8 +101,8 @@ $tables_struct = array(
 		),
 		'parent'=>array(
 			'type'=>'INT',
-			'size'=>10,
-			'unsigned'=>true,
+			'size'=>11,
+			'unsigned'=>false,
 			'null'=>false,
 			'default'=>0,
 			'key'=>'UNIQUE:folder',
