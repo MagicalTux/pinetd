@@ -62,6 +62,7 @@ function swrite(&$socket,$str,$send=false) {
 
 function sclose(&$socket) {
 //	@socket_shutdown($socket["sock"],2); // signal end of comm
+	fflush($socket['sock']);
 	@fclose($socket["sock"]);
 	$socket["state"]=false;
 }
