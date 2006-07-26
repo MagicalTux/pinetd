@@ -331,7 +331,7 @@ function pcmd_ehlo(&$socket,$cmdline) {
 }
   
 function pcmd_helo(&$socket,$cmdline,$oldprot=true) {
-	global $servername;
+	global $servername, $ssl_settings;
 	if ($socket["helo"]) {
 		swrite($socket,'503 I don\'t know why you say good bye, I say hello~ (Hello goodbye, The Beatles)');
 	} else {
@@ -351,7 +351,9 @@ function pcmd_helo(&$socket,$cmdline,$oldprot=true) {
 			swrite($socket,'250-'.$servername.' Pleased to meet you, '.$remote.'.');
 			swrite($socket,'250-PIPELINING');
 			swrite($socket,'250-ETRN');
-			if (function_exists('stream_socket_enable_crypto')) swrite($socket,'250-STARTTLS');
+			if (isset($ssl_settings[25])) {
+				if (function_exists('stream_socket_enable_crypto')) swrite($socket,'250-STARTTLS');
+			}
 			swrite($socket,"250 8BITMIME");
 		}
 	}
