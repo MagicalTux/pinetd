@@ -37,4 +37,5 @@ if [ x"$ENCRYPT" != x"no" ]; then
 fi
 
 cat "$CERTIFICATE.cert.pem" "$CERTIFICATE.key.pem" >"$CERTIFICATE.pem"
+chmod 0400 "$CERTIFICATE.pem"
 

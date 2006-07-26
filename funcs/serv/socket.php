@@ -39,6 +39,7 @@ function sread(&$socket) {
 }
 
 function swrite(&$socket,$str,$send=false) {
+	stream_set_blocking($socket['sock'], 1);
 	$str=str_replace("\r","",$str);
 	$str=str_replace("\n","",$str);
 	if (isset($socket["log_fp"])) {
@@ -49,7 +50,7 @@ function swrite(&$socket,$str,$send=false) {
 		$dat=0;
 		while ($dat != strlen($str)) {
 			$dat=@fwrite($socket["sock"],$str);
-			if ($dat === FALSE) {
+			if (($dat === FALSE) || ($dat===0)) {
 				$socket["state"]=false; // my socket is broken
 				return;
 			}
