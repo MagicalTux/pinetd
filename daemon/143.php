@@ -149,10 +149,9 @@ function ucmd_namespace(&$socket, $cmdline, $id) {
 }
 
 function ucmd_lsub(&$socket, $cmdline, $id) {
-	$arg = parse_imap_argv($cmdline);
+	$arg = parse_imap_argv(trim(substr($cmdline, 4)));
 	$namespace = $arg[0];
 	$param = $arg[1];
-	swrite($socket, '? DEBUG: '.$cmdline);
 	if ($namespace=='') $namespace='/';
 	if ($namespace!='/') {
 		swrite($socket, $id.' NO Unknown namespace');
