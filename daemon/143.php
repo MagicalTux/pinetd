@@ -157,6 +157,7 @@ function ucmd_lsub(&$socket, $cmdline, $id) {
 		swrite($socket, $id.' NO Unknown namespace');
 		return;
 	}
+	// TODO: Find doc and fix that according to correct process
 	swrite($socket, '* LSUB () "/" INBOX'); // "root" box - reserved name
 	$p = $socket['userinfo']['prefix'];
 	$req = 'SELECT id, name, parent FROM '.$p.'folders` WHERE account=\''.mysql_escape_string($socket['userinfo']['userid']).'\' ';
@@ -176,6 +177,25 @@ function ucmd_lsub(&$socket, $cmdline, $id) {
 		swrite($socket, '* LSUB () "/" '.$name);
 	}
 	swrite($socket, $id.' OK LSUB completed');
+}
+
+function ucmd_list(&$socket, $cmdline, $id) {
+	// * LIST () "/" INBOX
+/*
+C LIST "" INBOX
+* LIST () "/" INBOX
+C OK LIST completed
+*/
+	// TODO: Code this function
+	$arg = parse_imap_argv(trim(substr($cmdline, 4)));
+	$reference = $arg[0];
+	$param = $arg[1];
+	if ($reference=='') $reference='/';
+	$name = $param;
+	if ( (addslashes($name)!=$name) || (strpos($name, ' ')!==false))
+		$name='"'.addslashes($name).'"';
+	swrite($socket, '* LIST () "'.$reference.'" '.$name);
+	swrite($socket, $id.' OK LIST completed');
 }
 
 function pcmd_logout(&$socket,$cmdline, $id) {
