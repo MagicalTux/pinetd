@@ -533,7 +533,7 @@ function make_uniq($subpath,$domain=null,$account=null) {
 		while(strlen($acc)<4) $acc='0'.$acc;
 		$path.='/'.substr($acc,-1).'/'.substr($acc,-2).'/'.$acc;
 	}
-	mkdir($path, 0755, true);
+	if (!is_dir($path)) mkdir($path, 0755, true);
 	$path.='/';
 	$tmp=explode(' ',microtime());
 	$path.=$tmp[1].'.'.substr($tmp[0],2).'.'.code(5).getmypid().'.'.$servername;

@@ -1,8 +1,14 @@
 <?php
 
 function socket_init($type,$port,$ip="0.0.0.0") {
+	global $ssl_settings;
 	logstr("Creating '.$type.' socket ip $ip - port $port ...");
-	$socket = stream_socket_server($type.'://'.$ip.':'.$port, $errno, $errstr, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN);
+	if (isset($ssl_settings[$port])) {
+		$c = stream_context_create($ssl_settings[$port]);
+		$socket = stream_socket_server($type.'://'.$ip.':'.$port, $errno, $errstr, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN, $c);
+	} else {
+		$socket = stream_socket_server($type.'://'.$ip.':'.$port, $errno, $errstr, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN);
+	}
 	if (!$socket) {
 		$err='Error #'.$errno.': '.$errstr;
 		logstr("Could not set socket to listening state : ".$err);

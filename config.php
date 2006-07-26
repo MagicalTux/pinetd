@@ -32,3 +32,19 @@ define('PHPMAILD_DB_NAME','phpinetd-maild');
 $pmaild_mta_max_processes = 5;
 $pmaild_mta_thread_start_threshold = 5; // start 1 thread each 5 mails to send
 
+// SSL specific
+$ssl_settings = array(
+	25=>array( // SMTP's STARTTLS
+		'tls'=>array(
+			'verify_peer' => false, // Verify peer certificate?
+			'allow_self_signed' => true,
+			'cafile' => HOME_DIR.'ssl/newkey.pem', // Certificate Authority (certificate itself for self-signed)
+			'capath' => HOME_DIR.'ssl/',
+			'local_cert' => HOME_DIR.'ssl/newkey.pem', // Local certificate
+//			'passphrase' => '', // passphrase for certificate
+			'CN_match' => '', // Common Name of certificate
+		),
+	),
+);
+
+
