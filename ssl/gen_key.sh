@@ -36,3 +36,5 @@ if [ x"$ENCRYPT" != x"no" ]; then
 	fi
 fi
 
+cat "$CERTIFICATE.cert.pem" "$CERTIFICATE.key.pem" >"$CERTIFICATE.pem"
+
