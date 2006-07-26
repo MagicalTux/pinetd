@@ -76,14 +76,16 @@ function show_info() {
 	echo "Number of configured servers : ".count($info)." - Main thread pid : $pid\n";
 	echo "Detailed informations :\n";
 	echo "-----------------------\n";
-	echo "port\tstate\tmore\n";
+	echo "port\tstate\tclients\tmore\n";
 	reset($info);
 	while(list($port,$pinfo)=each($info)) {
-		echo $port."\t";
+		echo $port;
+		if (isset($pinfo['type'])) echo '/'.$pinfo['type']; // type : tcp/udp/ssl/tsl/etc..
+		echo "\t";
 		if (!$pinfo["up"]) {
-			echo "DOWN\t";
+			echo "DOWN\t-\t";
 			if ($pinfo["pid"]==0) {
-				echo "Daemon will be restarted as soon as possible.\n";
+				echo "Daemon will start ASAP\n";
 			} elseif ($pinfo["pid"]>0) {
 				echo "Daemon pid was : ".$pinfo["pid"]."\n";
 			} else {
@@ -94,6 +96,11 @@ function show_info() {
 			}
 		} else {
 			echo "UP\t";
+			if (isset($pinfo['c_clients'])) {
+				echo $pinfo['c_clients']."\t";
+			} else {
+				echo "-\t";
+			}
 			echo "PID=".$pinfo["pid"]."\n";
 		}
 	}

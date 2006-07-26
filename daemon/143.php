@@ -149,19 +149,10 @@ function ucmd_namespace(&$socket, $cmdline, $id) {
 }
 
 function ucmd_lsub(&$socket, $cmdline, $id) {
-	// LSUB "" "*"
-/*
-* LSUB () "/" INBOX
-* LSUB () "/" "INBOX/FSLT & HL"
-* LSUB () "/" INBOX/drafts
-* LSUB () "/" INBOX/sent-mail
-* LSUB () "/" "&AMk-l&AOk-ments envoy&AOk-s"
-* LSUB () "/" Brouillons
-B OK LSUB completed
-*/
 	$arg = parse_imap_argv($cmdline);
 	$namespace = $arg[0];
 	$param = $arg[1];
+	swrite($socket, '? DEBUG: '.$cmdline);
 	if ($namespace=='') $namespace='/';
 	if ($namespace!='/') {
 		swrite($socket, $id.' NO Unknown namespace');
@@ -185,9 +176,10 @@ B OK LSUB completed
 			$name='"'.addslashes($name).'"';
 		swrite($socket, '* LSUB () "/" '.$name);
 	}
+	swrite($socket, $id.' OK LSUB completed');
 }
 
-function pcmd_quit(&$socket,$cmdline, $id) {
+function pcmd_logout(&$socket,$cmdline, $id) {
 	global $servername;
 	swrite($socket,'* BYE '.$servername.' IMAP4rev1 server says bye !');
 	swrite($socket,$id.' OK LOGOUT completed');
@@ -195,7 +187,7 @@ function pcmd_quit(&$socket,$cmdline, $id) {
 	sclose($socket);
 	exit;
 }
-function ucmd_quit(&$socket,$cmdline, $id) {
+function ucmd_logout(&$socket,$cmdline, $id) {
 	global $servername;
 	swrite($socket,'* BYE '.$servername.' IMAP4rev1 server says bye !');
 	swrite($socket,$id.' OK LOGOUT completed');

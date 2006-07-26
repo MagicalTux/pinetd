@@ -365,6 +365,8 @@ function pcmd_help(&$socket,$cmdline) {
 }
 
 function pcmd_starttls(&$socket, $cmdline) {
+	// NB: This function will not work for now
+	// see: http://bugs.php.net/bug.php?id=36445
 	if (!function_exists('stream_socket_enable_crypto')) {
 		swrite($socket, '454 TLS not available. You need PHP 5 >= 5.1.0RC1 with OpenSSL module');
 		return;

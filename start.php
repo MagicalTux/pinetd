@@ -3,6 +3,7 @@
 
 echo "Loading phpInetd v1.0 ...\n";
 if (!defined('HOME_DIR')) define('HOME_DIR', dirname(__FILE__).'/');
+define('DAEMON_PARENT_PID', getmypid());
 
 if (!file_exists(HOME_DIR.'config.php')) {
 	echo "Error : please configure before running.\n";
@@ -367,6 +368,7 @@ while(!$client) { // mit sur true si le thread est forké et deviens un thread cl
 			}
 		}
 	}
+	comm_update_info($server_port, PINETD_SOCKET_TYPE, count($clients));
 }
 fclose($master_socket);
 $mysql_cnx=getsql();
