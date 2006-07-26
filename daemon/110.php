@@ -23,7 +23,11 @@ function proto_welcome(&$socket) {
 		sclose($socket);
 		exit;
 	}
-	$socket["log_fp"]=fopen(HOME_DIR."log/pop3-".date("Ymd-His")."-".$socket["remote_ip"].'-'.getmypid().".log","w");
+	if (PINETD_SOCKET_TYPE=='ssl') {
+		$socket["log_fp"]=fopen(HOME_DIR."log/pop3s-".date("Ymd-His")."-".$socket["remote_ip"].'-'.getmypid().".log","w");
+	} else {
+		$socket["log_fp"]=fopen(HOME_DIR."log/pop3-".date("Ymd-His")."-".$socket["remote_ip"].'-'.getmypid().".log","w");
+	}
 	fputs($socket["log_fp"],"Client : ".$socket["remote_ip"].":".$socket["remote_port"]." connected.\r\n");
 	swrite($socket,"+OK $servername POP3 server (phpMaild v1.1 by MagicalTux <magicaltux@gmail.com>) ready.");
 }
