@@ -33,16 +33,18 @@ $pmaild_mta_max_processes = 5;
 $pmaild_mta_thread_start_threshold = 5; // start 1 thread each 5 mails to send
 
 // SSL specific
+// Read documentation there :
+// http://php.net/transports
 $ssl_settings = array(
 	25=>array( // SMTP's STARTTLS
 		'tls'=>array(
 			'verify_peer' => false, // Verify peer certificate?
 			'allow_self_signed' => true,
-			'cafile' => HOME_DIR.'ssl/newkey.pem', // Certificate Authority (certificate itself for self-signed)
-			'capath' => HOME_DIR.'ssl/',
+//			'cafile' => HOME_DIR.'ssl/newkey.pem', // Certificate Authority (certificate itself for self-signed)
+//			'capath' => HOME_DIR.'ssl/',
 			'local_cert' => HOME_DIR.'ssl/newkey.pem', // Local certificate
 //			'passphrase' => '', // passphrase for certificate
-			'CN_match' => '', // Common Name of certificate
+//			'CN_match' => '', // Common Name of certificate
 		),
 	),
 	995=>array( // POP3S
@@ -50,7 +52,6 @@ $ssl_settings = array(
 			'verify_peer' => false, // Verify peer certificate?
 			'allow_self_signed' => true,
 			'local_cert' => HOME_DIR.'ssl/newkey.pem',
-			'cafile' => HOME_DIR.'ssl/newkey.pem',
 //			'passphrase' => '', // passphrase for certificate
 		),
 	),
