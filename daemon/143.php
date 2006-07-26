@@ -104,6 +104,9 @@ function proto_welcome(&$socket) {
 	$socket['namespace'] = 'pcmd';
 	swrite($socket,'* OK [CAPABILITY IMAP4REV1 X-NETSCAPE LOGIN-REFERRALS AUTH=LOGIN] '.$servername.' IMAP4rev1 2001.305/pMaild at '.date(DATE_RFC2822));
 	mysql_query('SET NAMES utf8');
+	$socket['imap'] = array(
+		'select'=>null, // No select by default
+	);
 }
 
 function proto_handler(&$socket, $id, $dat) {
@@ -198,6 +201,64 @@ C OK LIST completed
 	swrite($socket, $id.' OK LIST completed');
 }
 
+function ucmd_select(&$socket, $cmdline, $id) {
+	$arg = parse_imap_argv(trim(substr($cmdline, 6)));
+	$p = $socket['userinfo']['prefix'];
+	if (count($arg)!=1) {
+		swrite($socket, $id.' BAD Please provide only one parameter');
+		return;
+	}
+	$box = mb_convert_encoding($arg[0], 'UTF-8', 'UTF7-IMAP,UTF-8'); // RFC says we should accept UTF-8
+	$box = explode('/', $box);
+	$pos = -1; // current position
+	foreach($box as $name) {
+		if (($name=='INBOX') && ($pos==-1)) {
+			$pos=0;
+			continue;
+		}
+		$req = 'SELECT `id` FROM '.$p.'folders` WHERE `account` =\''.mysql_escape_string($socket['userinfo']['userid']).'\' ';
+		$req.= 'AND `name` = \''.mysql_escape_string($name).'\' AND `parent`=\''.mysql_escape_string($pos).'\'';
+		$res = @mysql_query($req);
+		$res = @mysql_fetch_row($res);
+		if (!$res) {
+			swrite($socket, $id.' NO No such mailbox');
+			return;
+		}
+	}
+	// mailbox selected
+	$socket['imap']['select'] = $pos;
+	$req = 'SELECT `flags`, COUNT(1) FROM '.$p.'mails` WHERE `userid`=\''.mysql_escape_string($socket['userinfo']['userid']).'\' ';
+	$req.= 'AND `folder`=\''.mysql_escape_string($pos).'\' GROUP BY `flags`';
+	$res = @mysql_query($req);
+	$total = 0;
+	$recent = 0;
+	$unseen = 0;
+	while($resu = mysql_fetch_row($res)) {
+		$f = explode(',',$resu[0]);
+		$f = array_flip($f);
+		$c = $resu[1];
+		if (isset($f['recent'])) $recent+=$c;
+		$total+=$c;
+	}
+	if ($recent>0) {
+		// Check first unseen
+		$req = 'SELECT `mailid` FROM '.$p.'mails` WHERE `userid`=\''.mysql_escape_string($socket['userinfo']['userid']).'\' ';
+		$req.= 'AND `folder`=\''.mysql_escape_string($pos).'\' AND FIND_IN_SET(\'recent\',`flags`)>0 ';
+		$req.= 'ORDER BY `mailid` ASC ';
+		$req.= 'LIMIT 1';
+		$res = @mysql_query($req);
+		$res = @mysql_fetch_row($res);
+		if ($res) $unseen = $res[0];
+	}
+	swrite($socket, '* '.$total.' EXISTS');
+	swrite($socket, '* '.$recent.' RECENT');
+	if ($unseen) swrite($socket, '* OK [UNSEEN '.$unseen.'] Message '.$unseen.' is first unseen');
+	swrite($socket, '* OK [UIDVALIDITY '.$socket['userinfo']['userid'].'] UIDs valid'); // use userid~ (not required, 1 would've done the job)
+	swrite($socket, '* FLAGS (\Answered \Flagged \Deleted \Seen \Draft)');
+	// * OK [PERMANENTFLAGS (\Deleted \Seen \*)] Limited <-- ?? XXX: Need to get more details about PERMANENTFLAGS
+	swrite($socket, $id.' OK [READ-WRITE] SELECT completed');
+}
+
 function pcmd_logout(&$socket,$cmdline, $id) {
 	global $servername;
 	swrite($socket,'* BYE '.$servername.' IMAP4rev1 server says bye !');
@@ -288,6 +349,7 @@ function pcmd_login(&$socket,$cmdline, $id) {
 		'prefix'=>$p,
 		'userid'=>$res['id'],
 		'path'=>$path,
+		'select'=>null,
 	);
 	$socket['namespace']='ucmd';
 	swrite($socket,$id.' OK LOGIN accepted');
