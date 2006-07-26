@@ -96,8 +96,8 @@ function show_info() {
 			}
 		} else {
 			echo "UP\t";
-			if (isset($pinfo['c_clients'])) {
-				echo $pinfo['c_clients']."\t";
+			if (isset($pinfo['c_count'])) {
+				echo $pinfo['c_count']."\t";
 			} else {
 				echo "-\t";
 			}
