@@ -59,7 +59,7 @@ function pcmd_auth(&$socket,$cmdline) {
 		swrite($socket,'-ERR You are already identified');
 		return;
 	}
-	$cmdline=explode(' ',$cmdline);
+	$cmdline=explode(' ',rtrim($cmdline));
 	$cmd=array_shift($cmdline); // AUTH
 	if (!$cmdline) {
 		swrite($socket,'+OK list of SASL extensions follows');
@@ -70,6 +70,7 @@ function pcmd_auth(&$socket,$cmdline) {
 	$method=array_shift($cmdline);
 	if ($method!='PLAIN') {
 		swrite($socket,'-ERR Unknown AUTH method');
+		return;
 	}
 	$response=array_shift($cmdline);
 	if (!$response) {
