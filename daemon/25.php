@@ -522,14 +522,14 @@ function dnsbl_check(&$socket, $dnsbl) {
 				if ($bl_answer != $dns) return dnsbl_error($socket, $bl, $bl_answer, false);
 				break;
 		}
-		@mysql_query('REPLACE INTO `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` SET `ip` = \''.mysql_escape_string($ip).'\', `list` = \''.mysql_escape_string($bl).'\', `regdate` = NOW(), clear = \'Y\', `answer` = \''.mysql_escape_string($bl_answer).'\'');
+		@mysql_query('REPLACE INTO `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` SET `ip` = \''.mysql_escape_string($ip).'\', `list` = \''.mysql_escape_string($bl).'\', `regdate` = NOW(), clear = \'Y\'');
 	}
 	return false;
 }
 
 function dnsbl_error(&$socket, $list, $answer, $cached = true) {
 	$ip = $socket['remote_ip'];
-	if (!$cached) @mysql_query('REPLACE INTO `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` SET `ip` = \''.mysql_escape_string($ip).'\', `list` = \''.mysql_escape_string($list).'\', `regdate` = NOW(), clear = \'N\'');
+	if (!$cached) @mysql_query('REPLACE INTO `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` SET `ip` = \''.mysql_escape_string($ip).'\', `list` = \''.mysql_escape_string($list).'\', `regdate` = NOW(), clear = \'N\', `answer` = \''.mysql_escape_string($answer).'\'');
 	switch($list) {
 		case 'spews1':
 			return '500 You are listed on SPEWS LEVEL1 list - see http://www.spews.org/ask.cgi?x='.$ip.' for details';
