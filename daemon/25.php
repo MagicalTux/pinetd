@@ -488,7 +488,7 @@ function dnsbl_check(&$socket, $dnsbl) {
 	$ip = $socket['remote_ip'];
 	$rev_ip = implode('.', array_reverse(explode('.', $ip)));
 	foreach($dnsbl as $bl) {
-		$req = 'SELECT `clear` FROM `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` WHERE `ip` = \''.mysql_escape_string($ip).' AND `list` = \''.mysql_escape_string($bl).'\'';
+		$req = 'SELECT `clear` FROM `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` WHERE `ip` = \''.mysql_escape_string($ip).'\' AND `list` = \''.mysql_escape_string($bl).'\'';
 		$res = @mysql_query($req);
 		$res = @mysql_fetch_assoc($res);
 		if ($res) {
@@ -513,14 +513,14 @@ function dnsbl_check(&$socket, $dnsbl) {
 				if ($bl_answer == '127.0.0.2') return dnsbl_error($socket, $bl, false);
 				break;
 		}
-		@mysql_query('REPLACE INTO `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` SET `ip` = \''.mysql_escape_string($ip).', `list` = \''.mysql_escape_string($bl).'\', `regdate` = NOW(), clear = \'Y\'');
+		@mysql_query('REPLACE INTO `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` SET `ip` = \''.mysql_escape_string($ip).'\', `list` = \''.mysql_escape_string($bl).'\', `regdate` = NOW(), clear = \'Y\'');
 	}
 	return false;
 }
 
 function dnsbl_error(&$socket, $list, $cached = true) {
 	$ip = $socket['remote_ip'];
-	if (!$cached) @mysql_query('REPLACE INTO `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` SET `ip` = \''.mysql_escape_string($ip).', `list` = \''.mysql_escape_string($list).'\', `regdate` = NOW(), clear = \'N\'');
+	if (!$cached) @mysql_query('REPLACE INTO `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` SET `ip` = \''.mysql_escape_string($ip).'\', `list` = \''.mysql_escape_string($list).'\', `regdate` = NOW(), clear = \'N\'');
 	switch($list) {
 		case 'spews1':
 			return 'You are listed on SPEWS LEVEL1 list - see http://www.spews.org/ask.cgi?x='.$ip.' for details';
