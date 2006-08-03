@@ -5,13 +5,14 @@
  * This script runs as a background task
  */
 
-$iterate=5;
+$iterate=1;
 $mta_agents = array();
 error_reporting(E_ALL);
 
 function main_loop() {
+	global $iterate;
 	// Main loop, called every 1 second
-	if ($iterate-->0) return; // only works 1 time every 5 seconds :)
+	if ($iterate-->=0) return; // only works 1 time every 5 seconds :)
 	$iterate=5;
 	check_queue();
 }
@@ -21,14 +22,20 @@ function check_queue() {
 	// check for dead childs
 	foreach($mta_agents as $pid=>&$agent) {
 		$sta=pcntl_waitpid($pid,$status,WNOHANG);
-		if ($sta!=0) unset($mta_agents[$pid]);
+		if ($sta!=0) {
+			echo "Process $pid died\n";
+			unset($mta_agents[$pid]);
+		}
 	}
 	if (count($mta_agents)>=$pmaild_mta_max_processes) return; // too many agents running
 	$req = 'SELECT COUNT(1) ';
 	$req.= 'FROM `'.PHPMAILD_DB_NAME.'`.`mailqueue` ';
 	$req.= 'WHERE `next_attempt` > NOW() OR `next_attempt` IS NULL';
 	$res = @mysql_query($req);
-	if ((!$res) && (!$mta_agents)) exit(180); // Database not installed?
+	if ((!$res) && (!$mta_agents)) {
+		echo 'failed query'."\n";
+		exit(180); // Database not installed?
+	}
 	$res = @mysql_fetch_row($res);
 	$count = $res[0];
 	if ($count==0) return; // nothing to send out, let's go back to sleep
