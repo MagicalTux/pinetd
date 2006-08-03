@@ -503,13 +503,16 @@ function dnsbl_check(&$socket, $dnsbl) {
 			case 'spews2':
 				$dns = $rev_ip.'.l2.spews.dnsbl.sorbs.net';
 				break;
+			case 'spamcop':
+				$dns = $rev_ip.'.bl.spamcop.net';
+				break;
 			default:
 				$dns = NULL;
 		}
 		if (is_null($dns)) continue;
 		$bl_answer = gethostbyname($dns);
 		switch($bl) {
-			case 'spews1': case 'spews2':
+			case 'spews1': case 'spews2': case 'spamcop':
 				if ($bl_answer == '127.0.0.2') return dnsbl_error($socket, $bl, false);
 				break;
 		}
@@ -526,6 +529,8 @@ function dnsbl_error(&$socket, $list, $cached = true) {
 			return '500 You are listed on SPEWS LEVEL1 list - see http://www.spews.org/ask.cgi?x='.$ip.' for details';
 		case 'spews2':
 			return '500 You are listed on SPEWS LEVEL2 list - see http://www.spews.org/ask.cgi?x='.$ip.' for details';
+		case 'spamcop':
+			return '500 You are listed on SpamCop - see http://www.spamcop.net/w3m?action=checkblock&ip='.$ip.' for details';
 	}
 }
 
