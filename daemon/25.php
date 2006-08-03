@@ -515,6 +515,7 @@ function dnsbl_check(&$socket, $dnsbl) {
 		}
 		@mysql_query('REPLACE INTO `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` SET `ip` = \''.mysql_escape_string($ip).', `list` = \''.mysql_escape_string($bl).'\', `regdate` = NOW(), clear = \'Y\'');
 	}
+	return false;
 }
 
 function dnsbl_error(&$socket, $list, $cached = true) {
