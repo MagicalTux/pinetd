@@ -273,7 +273,6 @@ if (is_numeric($server_port)) {
 		logstr("FATAL : could not load subprocess $server_port ...");
 		exit(60);
 	}
-	$mysql_cnx=getsql();
 	while(1) {
 		sleep(1);
 		if (comm_check_shutdown()) {

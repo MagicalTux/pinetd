@@ -7,7 +7,6 @@
 
 $iterate=1;
 $mta_agents = array();
-error_reporting(E_ALL);
 
 function main_loop() {
 	global $iterate;
@@ -22,21 +21,20 @@ function check_queue() {
 	// check for dead childs
 	foreach($mta_agents as $pid=>&$agent) {
 		$sta=pcntl_waitpid($pid,$status,WNOHANG);
-		if ($sta!=0) {
-			echo "Process $pid died\n";
-			unset($mta_agents[$pid]);
-		}
+		if ($sta!=0) unset($mta_agents[$pid]);
 	}
 	if (count($mta_agents)>=$pmaild_mta_max_processes) return; // too many agents running
+	$sql = getsql();
 	$req = 'SELECT COUNT(1) ';
 	$req.= 'FROM `'.PHPMAILD_DB_NAME.'`.`mailqueue` ';
 	$req.= 'WHERE `next_attempt` > NOW() OR `next_attempt` IS NULL';
-	$res = @mysql_query($req);
+	$res = @mysql_query($req, $sql);
 	if ((!$res) && (!$mta_agents)) {
-		echo 'failed query'."\n";
+		@mysql_close($sql);
 		exit(180); // Database not installed?
 	}
 	$res = @mysql_fetch_row($res);
+	@mysql_close($sql);
 	$count = $res[0];
 	if ($count==0) return; // nothing to send out, let's go back to sleep
 	$to_start = (int)($count/$pmaild_mta_thread_start_threshold);
