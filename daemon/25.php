@@ -523,9 +523,9 @@ function dnsbl_error(&$socket, $list, $cached = true) {
 	if (!$cached) @mysql_query('REPLACE INTO `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` SET `ip` = \''.mysql_escape_string($ip).'\', `list` = \''.mysql_escape_string($list).'\', `regdate` = NOW(), clear = \'N\'');
 	switch($list) {
 		case 'spews1':
-			return 'You are listed on SPEWS LEVEL1 list - see http://www.spews.org/ask.cgi?x='.$ip.' for details';
+			return '500 You are listed on SPEWS LEVEL1 list - see http://www.spews.org/ask.cgi?x='.$ip.' for details';
 		case 'spews2':
-			return 'You are listed on SPEWS LEVEL2 list - see http://www.spews.org/ask.cgi?x='.$ip.' for details';
+			return '500 You are listed on SPEWS LEVEL2 list - see http://www.spews.org/ask.cgi?x='.$ip.' for details';
 	}
 }
 
