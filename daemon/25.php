@@ -519,7 +519,7 @@ function dnsbl_check(&$socket, $dnsbl) {
 				if ($bl_answer == '127.0.0.2') return dnsbl_error($socket, $bl, $bl_answer, false);
 				break;
 			case 'spamhaus':
-				if ($bl_answer != '') return dnsbl_error($socket, $bl, $bl_answer, false);
+				if ($bl_answer != $dns) return dnsbl_error($socket, $bl, $bl_answer, false);
 				break;
 		}
 		@mysql_query('REPLACE INTO `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` SET `ip` = \''.mysql_escape_string($ip).'\', `list` = \''.mysql_escape_string($bl).'\', `regdate` = NOW(), clear = \'Y\', `answer` = \''.mysql_escape_string($bl_answer).'\'');
