@@ -488,12 +488,12 @@ function dnsbl_check(&$socket, $dnsbl) {
 	$ip = $socket['remote_ip'];
 	$rev_ip = implode('.', array_reverse(explode('.', $ip)));
 	foreach($dnsbl as $bl) {
-		$req = 'SELECT `clear` FROM `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` WHERE `ip` = \''.mysql_escape_string($ip).'\' AND `list` = \''.mysql_escape_string($bl).'\'';
+		$req = 'SELECT `clear`, `answer` FROM `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` WHERE `ip` = \''.mysql_escape_string($ip).'\' AND `list` = \''.mysql_escape_string($bl).'\'';
 		$res = @mysql_query($req);
 		$res = @mysql_fetch_assoc($res);
 		if ($res) {
 			if ($res['clear']=='Y') continue; // clear on this list
-			if ($res['clear']=='N') return dnsbl_error($socket, $bl); // not clear
+			if ($res['clear']=='N') return dnsbl_error($socket, $bl, $res['answer']); // not clear
 		}
 		// check DNSBL
 		switch($bl) {
@@ -506,6 +506,9 @@ function dnsbl_check(&$socket, $dnsbl) {
 			case 'spamcop':
 				$dns = $rev_ip.'.bl.spamcop.net';
 				break;
+			case 'spamhaus':
+				$dns = $rev_ip.'.sbl-xbl.spamhaus.org'; // http://www.spamhaus.org/sbl/howtouse.html
+				break;
 			default:
 				$dns = NULL;
 		}
@@ -513,15 +516,18 @@ function dnsbl_check(&$socket, $dnsbl) {
 		$bl_answer = gethostbyname($dns);
 		switch($bl) {
 			case 'spews1': case 'spews2': case 'spamcop':
-				if ($bl_answer == '127.0.0.2') return dnsbl_error($socket, $bl, false);
+				if ($bl_answer == '127.0.0.2') return dnsbl_error($socket, $bl, $bl_answer, false);
+				break;
+			case 'spamhaus':
+				if ($bl_answer != '') return dnsbl_error($socket, $bl, $bl_answer, false);
 				break;
 		}
-		@mysql_query('REPLACE INTO `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` SET `ip` = \''.mysql_escape_string($ip).'\', `list` = \''.mysql_escape_string($bl).'\', `regdate` = NOW(), clear = \'Y\'');
+		@mysql_query('REPLACE INTO `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` SET `ip` = \''.mysql_escape_string($ip).'\', `list` = \''.mysql_escape_string($bl).'\', `regdate` = NOW(), clear = \'Y\', `answer` = \''.mysql_escape_string($bl_answer).'\'');
 	}
 	return false;
 }
 
-function dnsbl_error(&$socket, $list, $cached = true) {
+function dnsbl_error(&$socket, $list, $answer, $cached = true) {
 	$ip = $socket['remote_ip'];
 	if (!$cached) @mysql_query('REPLACE INTO `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` SET `ip` = \''.mysql_escape_string($ip).'\', `list` = \''.mysql_escape_string($list).'\', `regdate` = NOW(), clear = \'N\'');
 	switch($list) {
@@ -531,6 +537,11 @@ function dnsbl_error(&$socket, $list, $cached = true) {
 			return '500 You are listed on SPEWS LEVEL2 list - see http://www.spews.org/ask.cgi?x='.$ip.' for details';
 		case 'spamcop':
 			return '500 You are listed on SpamCop - see http://www.spamcop.net/w3m?action=checkblock&ip='.$ip.' for details';
+		case 'spamhaus':
+			if ($answer=='127.0.0.2') return '500 You are listed on Spamhaus Block List - check http://www.spamhaus.org/query/bl?ip='.$ip;
+			if ($answer=='127.0.0.4') return '500 You are listed in CBL - check http://cbl.abuseat.org/lookup.cgi?ip='.$ip;
+			if ($answer=='127.0.0.5') return '500 You are listed in NJABL - check http://www.njabl.org/cgi-bin/lookup.cgi?query='.$ip;
+			return '500 You are listed on Spamhaus Block List - check http://www.spamhaus.org/query/bl?ip='.$ip;
 	}
 }
 
