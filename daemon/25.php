@@ -486,6 +486,13 @@ function dnsbl_check(&$socket, $dnsbl) {
 		$dnsbl = explode(',', $dnsbl);
 	}
 	$ip = $socket['remote_ip'];
+	// check for relaying
+	$req = 'SELECT 1 FROM `'.PHPMAILD_DB_NAME.'`.`hosts` ';
+	$req.= 'WHERE `ip` = \''.mysql_escape_string($ip).'\' ';
+	$req.= 'AND `type` = \'trust\' AND (`expires` > NOW() OR `expires` IS NULL) ';
+	$res = @mysql_query($req);
+	$res = @mysql_fetch_row($res);
+	if ($res) return false; // trusted ip
 	$rev_ip = implode('.', array_reverse(explode('.', $ip)));
 	foreach($dnsbl as $bl) {
 		$req = 'SELECT `clear`, `answer` FROM `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` WHERE `ip` = \''.mysql_escape_string($ip).'\' AND `list` = \''.mysql_escape_string($bl).'\'';
@@ -564,7 +571,7 @@ function pcmd_rcpt(&$socket,$cmdline) {
 				// check for relaying
 				$req = 'SELECT `user_email` FROM `'.PHPMAILD_DB_NAME.'`.`hosts` ';
 				$req.= 'WHERE `ip` = \''.mysql_escape_string($socket['remote_ip']).'\' ';
-				$req.= 'AND `type` = \'trust\' AND `expires` > NOW()';
+				$req.= 'AND `type` = \'trust\' AND (`expires` > NOW() OR `expires` IS NULL)';
 				$res = @mysql_query($req);
 				$res = @mysql_fetch_row($res);
 				if ($res) {
