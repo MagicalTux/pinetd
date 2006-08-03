@@ -7,6 +7,7 @@
 
 $iterate=5;
 $mta_agents = array();
+error_reporting(E_ALL);
 
 function main_loop() {
 	// Main loop, called every 1 second
