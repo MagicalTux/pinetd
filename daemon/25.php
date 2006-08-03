@@ -492,8 +492,8 @@ function dnsbl_check(&$socket, $dnsbl) {
 		$res = @mysql_query($req);
 		$res = @mysql_fetch_assoc($res);
 		if ($res) {
-			if ($res['clear']=='N') continue; // clear on this list
-			if ($res['clear']=='Y') return dnsbl_error($socket, $bl); // not clear
+			if ($res['clear']=='Y') continue; // clear on this list
+			if ($res['clear']=='N') return dnsbl_error($socket, $bl); // not clear
 		}
 		// check DNSBL
 		switch($bl) {
