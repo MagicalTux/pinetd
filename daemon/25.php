@@ -768,7 +768,7 @@ function run_as_spamassassin(&$socket, $filename, $fh, $data) {
 	stream_copy_to_stream($in,$fh);
 	fclose($in);
 	unlink($out);
-	if (array_search('drop_email_on_spam',$data['flags'])!==false) {
+	if (array_search('drop_email_on_spam',$data['domain_data']['flags'])!==false) {
 		if ($rc>0) {
 			swrite($socket,'500 Message detected as spam, please check your mail.');
 			return $rc;
