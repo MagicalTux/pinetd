@@ -681,7 +681,7 @@ function pcmd_data(&$socket,$cmdline) {
 				}
 				// pre-Local delivery (antivirus/antispam check)
 				if ( (run_antivirus($socket, $filename, $data['domain_data']['antivirus'])>0) 
-					|| (run_antispam($socket, $filename, $wrmail, $data['domain_data']['antispam'])>0) )
+					|| (run_antispam($socket, $filename, $wrmail, $data['domain_data']['antispam'], $data)>0) )
 				{
 					if (isset($socket["mail_from"])) unset($socket["mail_from"]);
 					if (isset($socket["mail_to"])) unset($socket["mail_to"]);
@@ -724,11 +724,11 @@ function pcmd_data(&$socket,$cmdline) {
 	}
 }
 
-function run_antispam(&$socket, $filename, $fh, $as) {
+function run_antispam(&$socket, $filename, $fh, $as, $data) {
 	foreach($as as $a) {
 		$fnc='run_as_'.$a;
 		if (function_exists($fnc)) {
-			$res=$fnc($socket,$filename,$fh);
+			$res=$fnc($socket,$filename,$fh, $data);
 			if ($res>0) return $res;
 		}
 	}
@@ -746,10 +746,10 @@ function run_antivirus(&$socket, $filename, $av) {
 	return 0;
 }
 
-function run_as_spamassassin(&$socket, $filename, $fh) {
+function run_as_spamassassin(&$socket, $filename, $fh, $data) {
 	$out=make_uniq('tmp');
-	$cmd='/usr/bin/spamassassin';
-	if (!is_executable('/usr/bin/spamc')) $cmd='/usr/bin/spamc';
+	$cmd='/usr/bin/spamassassin --exit-code';
+	if (!is_executable('/usr/bin/spamc')) $cmd='/usr/bin/spamc -E';
 	$cmd.=' '.escapeshellarg($filename).' >'.escapeshellarg($out);
 	$res=system($cmd,$rc);
 	if (filesize($out)<50) {
@@ -768,6 +768,12 @@ function run_as_spamassassin(&$socket, $filename, $fh) {
 	stream_copy_to_stream($in,$fh);
 	fclose($in);
 	unlink($out);
+	if (array_search('drop_email_on_spam',$data['flags'])!==false) {
+		if ($rc>0) {
+			swrite($socket,'500 Message detected as spam, please check your mail.');
+			return $rc;
+		}
+	}
 	return 0;
 }
 
