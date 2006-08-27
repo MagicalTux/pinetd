@@ -749,7 +749,7 @@ function run_antivirus(&$socket, $filename, $av) {
 function run_as_spamassassin(&$socket, $filename, $fh, $data) {
 	$out=make_uniq('tmp');
 	$cmd='/usr/bin/spamassassin --exit-code';
-	if (is_executable('/usr/bin/spamc')) $cmd='/usr/bin/spamc -E';
+	if (is_executable('/usr/bin/spamc')) $cmd='/usr/bin/spamc -E <';
 	$cmd.=' '.escapeshellarg($filename).' >'.escapeshellarg($out);
 	$res=system($cmd,$rc);
 	if (filesize($out)<50) {
