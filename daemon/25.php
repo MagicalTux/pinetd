@@ -131,6 +131,12 @@ $tables_struct = array(
 			'unsigned'=>true,
 			'key'=>'UNIQUE:userid',
 		),
+		'size' => array(
+			'type'=>'INT',
+			'size'=>10,
+			'null'=>false,
+			'unsigned'=>true,
+		),
 		'uniqname' => array(
 			'type'=>'VARCHAR',
 			'size'=>128,
@@ -409,9 +415,14 @@ function resolve_email(&$socket,$addr) {
 	$res=@mysql_query($req);
 	$res=@mysql_fetch_assoc($res);
 	if (!$res) return false;
-	$t = dnsbl_check($socket, $res['dnsbl']);
+	$trust = false;
+	$t = dnsbl_check($socket, $trust, $res['dnsbl']);
 	if ($t!==false) return $t;
 	$domain_antispam=false;
+	if ($trust) {
+		// we trust this IP, so we'll skip antispam check
+		$res['antispam'] = '';
+	}
 	if ( ($res['antispam']!='') or ($res['antivirus']!='')) {
 		// special case : if we have to use an antispam system, we MUST have only one RCPT TO line
 		$domain_antispam=true;
@@ -481,7 +492,7 @@ function resolve_email(&$socket,$addr) {
  * spews2 : Spews Level 2 (Level 1 + spam friendly)
  * 
  */
-function dnsbl_check(&$socket, $dnsbl) {
+function dnsbl_check(&$socket, &$trust, $dnsbl) {
 	if (!is_array($dnsbl)) {
 		$dnsbl = explode(',', $dnsbl);
 	}
@@ -492,7 +503,10 @@ function dnsbl_check(&$socket, $dnsbl) {
 	$req.= 'AND `type` = \'trust\' AND (`expires` > NOW() OR `expires` IS NULL) ';
 	$res = @mysql_query($req);
 	$res = @mysql_fetch_row($res);
-	if ($res) return false; // trusted ip
+	if ($res) {
+		$trust = true;
+		return false; // trusted ip
+	}
 	$rev_ip = implode('.', array_reverse(explode('.', $ip)));
 	foreach($dnsbl as $bl) {
 		$req = 'SELECT `clear`, `answer` FROM `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` WHERE `ip` = \''.mysql_escape_string($ip).'\' AND `list` = \''.mysql_escape_string($bl).'\'';
@@ -698,9 +712,11 @@ function pcmd_data(&$socket,$cmdline) {
 				fseek($wrmail,0);
 				stream_copy_to_stream($wrmail,$out);
 				fclose($out);
+				$size = filesize($target); // get final size
 				$p='`'.PHPMAILD_DB_NAME.'`.`z'.$data['domain'].'_';
-				$req='INSERT INTO '.$p.'mails` SET folder=0, userid=\''.mysql_escape_string($data['account']).'\', ';
-				$req.='uniqname=\''.mysql_escape_string(basename($target)).'\'';
+				$req='INSERT INTO '.$p.'mails` SET `folder`=0, `userid`=\''.mysql_escape_string($data['account']).'\', ';
+				$req.='`uniqname`=\''.mysql_escape_string(basename($target)).'\', ';
+				$req.='`size` = \''.mysql_escape_string($size).'\'';
 				@mysql_query($req);
 				$mid=mysql_insert_id();
 				$req='';
