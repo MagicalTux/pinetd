@@ -1,21 +1,20 @@
-<?
-// SimpleFTP server v1.0r2
+<?php
+// SimpleFTPd server v1.2
 //
-//	***** CODE NAME : KASUMI
+//	***** CODENAME: KASUMI
 //
-// vars :
-// $current_socket : socket en cours
-// $mysql_cnx : connexion MySQL
-// $servername : nom du serv (eg. Ringo.FF.st ) 
+// This is the OOKOO.ORG version of the FTP daemon
+// Some parts of the code are made especially for ookoo.org, and it can not
+// be used «as is». However this is the only version working with the new API.
 
 if (!defined('PINETD_SOCKET_TYPE')) define('PINETD_SOCKET_TYPE', 'tcp');
 $connect_error="500 Server not ready";
 $unknown_command="500 Wakari-masen";
-$socket_timeout=300; // 5 min
+$socket_timeout=300; // 5 mn
 
 $srv_info=array();
-$srv_info["name"]="SimpleFTP Server v1.0r2 by MagicalTux <MagicalTux@gmail.com>";
-$srv_info["version"]="1.0.2";
+$srv_info["name"]="SimpleFTPd Server v1.2 by MagicalTux <MagicalTux@gmail.com>";
+$srv_info["version"]="1.2.0";
 
 function proto_check(&$socket,$clients) {
 	global $max_users,$max_users_per_ip;
@@ -91,51 +90,47 @@ function proto_handler(&$socket,$cmd,$cmdline) {
 
 function pcmd_quit(&$socket,$cmdline) {
 	swrite($socket,"221 Ja mata !");
+	sleep(2);
 	sclose($socket);
 	exit;
 }
 
 function pcmd_user(&$socket,$cmdline) {
-	global $max_anonymous;
-	if (!eregi("^USER( +)([^ ]+)\$",$cmdline,$regs)) {
-		swrite($socket,"501 ".locmsg($socket,"syntax")." USER ".locmsg($socket,"login"));
-		return;
-	} elseif ($socket["logon"]) {
+	global $max_anonymous, $ftp_uid, $ftp_gid;
+	if ($socket["logon"]) {
 		swrite($socket,"500 ".locmsg($socket,"already_logon"));
 		return;
 	}
-	$login=strtolower($regs[2]);
+	$login=trim(substr($cmdline, 5));
 	if ( ($login == "ftp") or ($login == "anonymous") or ($login == "anon") ) {
 		// check for $max_anonymous
 		if ($max_anonymous<$socket["num_cli"]) {
 			swrite($socket,"415 Error : too many users for allowing anonymous access.");
 			return;
 		}
-		if (!chdir('/usr/ftp')) {
+		if ( (!is_dir('/usr/ftp')) || (!chdir('/usr/ftp')) || (!chroot('/usr/ftp')) ) {
 			swrite($socket,'415 Error : No anonymous login accepted on this server.');
 			return;
 		}
+		posix_setgid($ftp_gid);
+		posix_setuid($ftp_uid);
 		$login = NULL;
 		$socket["access"]=-1;
 		$socket["user"]=$login;
 		$socket["pass"]=$login;
 		$socket["logon"]=true;
-		$socket["root"]=getcwd();
+		$socket["root"]='/';
 		chdir($socket["root"]);
 		swrite($socket,"230 ".locmsg($socket,"anon_logon"));
 		return;
 	}
-	$login=ereg_replace("[^a-z0-9_@.-]","",strtolower($regs[2]));
 	$socket["user"]=$login;
 	swrite($socket,"331 ".locmsg($socket,"user_need_pass",$login));
 }
 
 function pcmd_pass(&$socket,$cmdline) {
-	global $ftp_server;
-	if (!eregi("^PASS( +)([^ ]+)\$",$cmdline,$regs)) {
-		swrite($socket,"501 ".locmsg($socket,"syntax")." PASS ".locmsg($socket,"password"));
-		return;
-	} elseif ($socket["logon"]) {
+	global $ftp_server, $ftp_uid, $ftp_gid;
+	if ($socket["logon"]) {
 		if ($socket["user"] === NULL) {
 			swrite($socket,"230 ".locmsg($socket,"anon_pass"));
 		} else {
@@ -146,41 +141,79 @@ function pcmd_pass(&$socket,$cmdline) {
 		swrite($socket,"500 ".locmsg($socket,"pass_req_user"));
 		return;
 	}
-	$pass=$regs[2];
-	$req="SELECT sysroot, ftpenabled, ftppass, space, server, access FROM nezumi_host.domains WHERE domain = '".$socket["user"]."'";
-	$res=mysql_query($req);
-	if (!$res=@mysql_fetch_object($res)) {
+	$login=str_replace('_at_', '@', $socket['user']);
+	$pass=trim(substr($cmdline, 5));
+	$login = explode('@', $login);
+	if (count($login)==1) $login = array('webmaster', $login[0]);
+
+	$req = 'SELECT id, server, ftpenabled, quota, UNIX_TIMESTAMP(expires) AS expires, dirname, `access`, uid FROM `ookoo-host`.`host_dirs` WHERE keyname = \''.mysql_escape_string($login[1]).'\'';
+	$res = @mysql_query($req);
+	$dominfo = @mysql_fetch_assoc($res);
+	if (!$dominfo) {
 		sleep(2);
 		swrite($socket,"500 ".locmsg($socket,"pass_invalid"));
 		return;
 	}
-	if ( ($res->ftppass != md5($pass)) or ($res->ftppass == "") ) {
+
+	if ($login[0]=='webmaster') $login[0] = '%'.$dominfo['uid'];
+
+	if ( (substr($login[0], 0, 1) != '%') || (strlen($login[0]) != 5)) {
+		// find user in DB
+		$req = 'SELECT nickname, uid, password FROM `ookoo`.`users` WHERE nickname = \''.mysql_escape_string($login[0]).'\'';
+	} else {
+		// find user by UID
+		$req = 'SELECT nickname, uid, password FROM `ookoo`.`users` WHERE uid = \''.mysql_escape_string(substr($login[0], 1)).'\'';
+	}
+	$res = @mysql_query($req);
+	$userinfo = @mysql_fetch_assoc($res);
+	if (!$userinfo) {
 		sleep(2);
 		swrite($socket,"500 ".locmsg($socket,"pass_invalid"));
 		return;
 	}
-	if ($res->ftpenabled != "Y") {
+	if (crypt($pass, $userinfo['password']) != $userinfo['password']) {
+		sleep(2);
+		swrite($socket,"500 ".locmsg($socket,"pass_invalid"));
+		return;
+	}
+	// check if user can access the FTP...
+	if ($userinfo['uid'] != $dominfo['uid']) {
+		$req = 'SELECT 1 FROM `ookoo-host`.`host_ftpaccess` WHERE hostid = \''.mysql_escape_string($dominfo['id']).'\' AND uid = \''.mysql_escape_string($userinfo['uid']).'\'';
+		$res = @mysql_query($req);
+		if (@mysql_num_rows($res)<1) {
+			sleep(2);
+			swrite($socket,"500 ".locmsg($socket,"pass_invalid"));
+			return;
+		}
+	}
+	
+	if ($dominfo['ftpenabled'] != 'Y') {
 		sleep(2);
 		swrite($socket,"500 ".locmsg($socket,"pass_disabled"));
 		return;
 	}
-	if ($res->server != $ftp_server) {
+	if ($dominfo['server'] != $ftp_server) {
 		swrite($socket,"500 ".locmsg($socket,"server_wrongserver",$res->server));
 		return;
 	}
-	if (!is_dir($res->sysroot)) {
+	if ($dominfo['expires'] < time()) {
+		swrite($socket, '500 Your hosting has expired ! Please renew it.');
+		return;
+	}
+	var_dump($dominfo['dirname']);
+	if ( (!is_dir($dominfo['dirname'])) || (!chroot($dominfo['dirname'])) ) {
 		swrite($socket,"500 ".locmsg($socket,"pass_noroot"));
 		return;
 	}
-	$dir=$res->sysroot;
-	chdir($dir);
-	$dir = getcwd();
+	posix_setgid($ftp_gid);
+	posix_setuid($ftp_uid);
 	swrite($socket,"230-".locmsg($socket,"pass_ok",$socket["user"]));
 	swrite($socket,"230-".locmsg($socket,"pass_fxp"));
-	$socket["access"]=$res->access;
+	$socket["access"]=$dominfo['access'];
 	$socket["logon"]=true;
-	$socket["root"]=$dir;
-	$socket["space"]=$res->space;
+	$socket["root"]='/';
+	$socket["space"]=$dominfo['quota'];
+	$socket['dominfo'] = $dominfo;
 	update_quota($socket);
 	show_quota($socket,"230 ");
 }
@@ -333,34 +366,19 @@ function pcmd_pasv(&$socket,$cmdline) {
 	// passive mode
 	global $pasv_ip;
 	$myip="";
-	socket_getsockname($socket["sock"],$myip);
-	$myip = stream_socket_get_name($socket['sock'], false);
-	list($myip, $myport) = explode(':', $myip);
-
-	$sock=@socket_create (AF_INET, SOCK_STREAM, SOL_TCP);
+	list($myip, $myport) = explode(':', stream_socket_get_name($socket["sock"], false));
+	$sock=@stream_socket_server('tcp://'.$myip.':0', $errno, $errstr);
 	if (!$sock) {
-		swrite($socket,"500 Couldn't create socket : ".socket_strerror($sock));
+		swrite($socket,"500 Couldn't create socket : [".$errno.']: '.$errstr);
 		return false;
 	}
-	// bind to a random port, thanks to socket_bind
-	if (!@socket_bind($sock,$myip)) {
-		swrite($socket,"500 Couldn't bind socket");
-		socket_close($sock);
-		return false;
-	}
-	$res=socket_listen($sock,5);
-	if (!$res) {
-		socket_close($sock);
-		swrite($socket,"500 Couldn't set socket listning : ".socket_strerror($res));
-		return false;
-	}
-
 	$socket["mode"]=-1;
 	$socket["mode_sock"]=$sock;
 	socket_getsockname($sock,$myip,$myport);
+	list($myip, $myport) = explode(':', stream_socket_get_name($sock, false));
 	$myport2=( $myport >> 8 ) & 0xFF;
 	$myport=($myport & 0xFF);
-	if (trim($pasv_ip)!="") $myip=$pasv_ip;
+	if ($pasv_ip) $myip=$pasv_ip;
 	$res="227 Entering passive mode (".str_replace(".",",",$myip).",".$myport2.",".$myport.")";
 	swrite($socket,$res);
 }
@@ -370,15 +388,10 @@ function proto_connect(&$socket) {
 	if ($socket["mode"]==1) {
 		$socket["mode"]=0;
 		// connect to remote
-		$sock=@socket_create (AF_INET, SOCK_STREAM, SOL_TCP);
+		$sock=@stream_socket_client('tcp://'.$socket["mode_ip"].':'.$socket["mode_port"], $errno, $errstr, 30);
 		if (!$sock) {
-			swrite($socket,"500 Couldn't open new socket : ".socket_strerror($sock));
+			swrite($socket,"500 Couldn't connect to remote : [".$errno."]: ".$errstr);
 			return false;
-		}
-		$res= @socket_connect ($sock, $socket["mode_ip"], $socket["mode_port"]);
-		if (!$res) {
-			socket_close($sock);
-			swrite($socket,"500 Couldn't connect. Reason : ".socket_strerror(socket_last_error()));
 		}
 		$mode="ASCII";
 		if ($socket["binary"]) $mode="8-bit binary";
@@ -387,13 +400,13 @@ function proto_connect(&$socket) {
 		return array("sock" => $sock, "state" => true);
 	} elseif ($socket["mode"] == -1) {
 		// connect to remote...
-		$sock=@socket_accept($socket["mode_sock"]);
-		@socket_close($socket["mode_sock"]);
+		$sock=@stream_socket_accept($socket["mode_sock"], 60);
+		@fclose($socket["mode_sock"]);
 		if (!$sock) {
 			swrite($socket,"500 No incoming connexion, or connexion failed.");
 			return false;
 		}
-		socket_getpeername($sock,$peerip);
+		list($peerip, $peerport) = explode(':', stream_socket_get_name($sock, true));
 		$mode="ASCII";
 		if ($socket["binary"]) $mode="8-bit binary";
 		swrite($socket,"150-Accepted data connexion from $peerip");
@@ -405,7 +418,11 @@ function proto_connect(&$socket) {
 	return false;
 }
 
-function pcmd_list(&$socket,$cmdline) {
+function pcmd_nlst(&$socket, $cmdline) {
+	return pcmd_list($socket, $cmdline, true);
+}
+
+function pcmd_list(&$socket,$cmdline, $nlist=false) {
 	// in any way, list here
 	if (!$socket["logon"]) {
 		swrite($socket,"500 ".locmsg($socket,"not_logged"));
@@ -437,35 +454,39 @@ function pcmd_list(&$socket,$cmdline) {
 	closedir($dir);
 	reset($tmpdir);
 	while(list($num,$fil)=each($tmpdir)) {
-		clearstatcache();
-		$stat = stat($fil);
-		$flag="-rwx";
-		if (is_dir($fil)) $flag="drwx";
-		if (is_link($fil)) $flag="lrwx";
-		$mode=substr(decbin($stat["mode"]),-3);
-		if (substr($mode,0,1)=="1") $xflg ="r"; else $xflg ="-";
-		if (substr($mode,1,1)=="1") $xflg.="w"; else $xflg.="-";
-		if (substr($mode,2,1)=="1") $xflg.="x"; else $xflg.="-";
-		$flag.=$xflg.$xflg;
-		$blocks=$stat["blocks"];
-		while(strlen($blocks)<4) $blocks=" ".$blocks;
-		$res=$flag.=" ".$blocks." ";
-		$res.="0				"; // user
-		$res.="0				"; // group
-		$siz = $stat["size"];
-		while(strlen($siz)<8) $siz=" ".$siz;
-		$res.=$siz." "; // file size
-		$ftime = filemtime($fil); // moment de modification
-		$res.=date("M",$ftime); // month in 3 letters
-		$day = date("j",$ftime);
-		while(strlen($day)<3) $day=" ".$day;
-		$res.=$day;
-		$res.=" ".date("H:i",$ftime);
-		$res.=" ".$fil;
-		if (is_link($fil)) {
-			// reseolve the link
-			$dest = readlink($fil);
-			$res.=" -> ".$dest;
+		if (!$nlist) {
+			clearstatcache();
+			$stat = stat($fil);
+			$flag="-rwx";
+			if (is_dir($fil)) $flag="drwx";
+			if (is_link($fil)) $flag="lrwx";
+			$mode=substr(decbin($stat["mode"]),-3);
+			if (substr($mode,0,1)=="1") $xflg ="r"; else $xflg ="-";
+			if (substr($mode,1,1)=="1") $xflg.="w"; else $xflg.="-";
+			if (substr($mode,2,1)=="1") $xflg.="x"; else $xflg.="-";
+			$flag.=$xflg.$xflg;
+			$blocks=$stat["blocks"];
+			while(strlen($blocks)<4) $blocks=" ".$blocks;
+			$res=$flag.=" ".$blocks." ";
+			$res.="0				"; // user
+			$res.="0				"; // group
+			$siz = $stat["size"];
+			while(strlen($siz)<8) $siz=" ".$siz;
+			$res.=$siz." "; // file size
+			$ftime = filemtime($fil); // moment de modification
+			$res.=date("M",$ftime); // month in 3 letters
+			$day = date("j",$ftime);
+			while(strlen($day)<3) $day=" ".$day;
+			$res.=$day;
+			$res.=" ".date("H:i",$ftime);
+			$res.=" ".$fil;
+			if (is_link($fil)) {
+				// reseolve the link
+				$dest = readlink($fil);
+				$res.=" -> ".$dest;
+			}
+		} else {
+			$res = $fil;
 		}
 		swrite($sock,$res);
 	}
@@ -557,7 +578,7 @@ logstr($socket["user"]." requesting file ".$fn);
 		if ($socket["binary"]) {
 			fseek($fil,$offset);
 			$buf=fread($fil,16384);
-			$val=socket_write($sock["sock"],$buf);
+			$val=fwrite($sock["sock"],$buf);
 			if ($throttle) {
 				// limitation a 16k/.25 sec
 				usleep(250000);
@@ -728,18 +749,17 @@ $socket["binary"]=true;
 		$free=$socket["quota"]["free"];
 	}
 	$transfert=true; $ok=false; $nextlign=false; // ignore next line if the last line finish with \r and the new one contains only \n is ASCII mode
+	stream_set_blocking($sock["sock"], 1);
 	while ($transfert) {
 		// boucle de reception
 		if ($socket["binary"]) {
 			$buf="";
-			socket_clear_error();
-	socket_set_block($sock["sock"]);
-			$buf=socket_read($sock["sock"],8192,PHP_BINARY_READ);
+			$buf=fread($sock["sock"],8192);
 			if (!$buf) {	// only for blocking sockets
 				// on eof, consider that that's the end of the file
 				$transfert=false;
 			} else {
-				if ($free !== NULL) {
+				if (!is_null($free)) {
 					if ($free > 0) {
 						if (strlen($buf)>$free) {
 							$buf=substr($buf,0,$free);
@@ -784,10 +804,10 @@ $socket["binary"]=true;
 		// don't support the ABRT function - it's useless here
 	}
 	fclose($fil);
-	@chown($fn,$ftp_owner_u);
-	@chgrp($fn,$ftp_owner_g);
+//	@chown($fn,$ftp_owner_u);
+//	@chgrp($fn,$ftp_owner_g);
 	sclose($sock);
-	if ($free == 0) {
+	if ((!is_null($free)) &&  ($free == 0)) {
 		swrite($socket,"500 Quota exceed !");
 	} else {
 		swrite($socket,"226 Transfert successful.");
@@ -857,7 +877,7 @@ function update_quota(&$socket) {
 	$quota["total"] = $total;
 	$quota["free"] = $free;
 	$socket["quota"] = $quota;
-	$req="UPDATE nezumi_host.domains SET avail = $free WHERE domain = '".$socket["user"]."'";
+	$req = 'UPDATE `ookoo-host`.`host_dirs` SET avail = \''.mysql_escape_string($free).' WHERE id = \''.$socket['dominfo']['id'].'\'';
 	@mysql_query($req);
 }
 
@@ -879,7 +899,7 @@ function show_quota(&$socket,$prefix="226-") {
 	// 226-Using.... 
 	if ($socket["user"] == NULL) return; // no quota for anonymous
 	if ($socket["space"] == NULL) {
-		swrite($socket,$prefix."You have unlimited space");
+		swrite($socket,$prefix."You don't have any disk limitation !");
 		return;
 	}
 	$quota=$socket["quota"];
@@ -945,8 +965,8 @@ function pcmd_mkd(&$socket,$cmdline) {
 		return;
 	}
 	if (mkdir($fn)) {
-		@chown($fn,$ftp_owner_u);
-		@chgrp($fn,$ftp_owner_g);
+//		@chown($fn,$ftp_owner_u);
+//		@chgrp($fn,$ftp_owner_g);
 		swrite($socket,"221 Directory created.");
 	} else {
 		swrite($socket,"500 An error has occured.");
@@ -1221,8 +1241,8 @@ function pcmd_rnto(&$socket,$cmdline) {
 		return;
 	}
 	if (rename($from,$fn)) {
-		@chown($fn,$ftp_owner_u);
-		@chgrp($fn,$ftp_owner_g);
+//		@chown($fn,$ftp_owner_u);
+//		@chgrp($fn,$ftp_owner_g);
 		swrite($socket,"221 Rename successful.");
 	} else {
 		swrite($socket,"500 It seems that the rename failed.");
@@ -1368,7 +1388,7 @@ $locarray = array(
 		"already_logon" => "Vous êtes déjà identifié",
 		"anon_logon" => "Utilisateur anonyme accepté.",
 		"anon_pass" => "Le mot de passe n'a pas d'importance",
-		"user_need_pass" => "Utilisater %s1 accepté. Veuillez donner le mot de passe (PASS)",
+		"user_need_pass" => "Utilisateur %s1 accepté. Veuillez donner le mot de passe (PASS)",
 		"password" => "mot_de_passe",
 		"pass_req_user" => "Veuillez utiliser USER avant d'utiliser PASS",
 		"pass_invalid" => "Nom d'utilisateur ou mot de passe incorrect.",
@@ -1382,6 +1402,20 @@ $locarray = array(
 		"not_logged" => "Vous n'êtes pas identifié."
 	)
 );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 $fun = array(
 	"en" => array(
