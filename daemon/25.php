@@ -497,6 +497,8 @@ function dnsbl_check(&$socket, &$trust, $dnsbl) {
 		$dnsbl = explode(',', $dnsbl);
 	}
 	$ip = $socket['remote_ip'];
+	$req = 'DELETE FROM `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` WHERE `regdate` < DATE_SUB(NOW(), INTERVAL 1 DAY)';
+	@mysql_query($req);
 	// check for relaying
 	$req = 'SELECT 1 FROM `'.PHPMAILD_DB_NAME.'`.`hosts` ';
 	$req.= 'WHERE `ip` = \''.mysql_escape_string($ip).'\' ';
