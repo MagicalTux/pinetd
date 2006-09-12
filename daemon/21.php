@@ -146,7 +146,7 @@ function pcmd_pass(&$socket,$cmdline) {
 	$login = explode('@', $login);
 	if (count($login)==1) $login = array('webmaster', $login[0]);
 
-	$req = 'SELECT id, server, ftpenabled, quota, UNIX_TIMESTAMP(expires) AS expires, dirname, `access`, uid FROM `ookoo-host`.`host_dirs` WHERE keyname = \''.mysql_escape_string($login[1]).'\'';
+	$req = 'SELECT `id`, `keyname`, `server`, ftpenabled, `quota`, UNIX_TIMESTAMP(`expires`) AS `expires`, `dirname`, `access`, `uid` FROM `ookoo-host`.`host_dirs` WHERE `keyname` = \''.mysql_escape_string($login[1]).'\'';
 	$res = @mysql_query($req);
 	$dominfo = @mysql_fetch_assoc($res);
 	if (!$dominfo) {
@@ -207,7 +207,7 @@ function pcmd_pass(&$socket,$cmdline) {
 	}
 	posix_setgid($ftp_gid);
 	posix_setuid($ftp_uid);
-	swrite($socket,"230-".locmsg($socket,"pass_ok",$socket["user"]));
+	swrite($socket,"230-".locmsg($socket,"pass_ok",$dominfo['keyname']));
 	swrite($socket,"230-".locmsg($socket,"pass_fxp"));
 	$socket["access"]=$dominfo['access'];
 	$socket["logon"]=true;
