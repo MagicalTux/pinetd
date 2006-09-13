@@ -815,6 +815,40 @@ $socket["binary"]=true;
 	update_quota($socket);
 }
 
+function pcmd_site(&$socket,$cmdline) {
+	if (!$socket["logon"]) {
+		swrite($socket,"500 ".locmsg($socket,"not_logged"));
+		return;
+	}
+	$anonymous = false;
+	if ($socket["user"] == NULL) $anonymous = true;
+	$cmdline = ltrim(substr($cmdline, 5));
+	$cmdline = explode(' ', $cmdline);
+	$cmd = array_shift($cmdline);
+	$cmdline = implode(' ', $cmdline);
+	switch(strtolower($cmd)) {
+		case 'chmod':
+			if ($anonymous) {
+				swrite($socket, '500 Anonymous users are not allowed to use CHMOD');
+			} else {
+				swrite($socket, '200 Chmod not supported');
+			}
+			return;
+		case 'md5':
+			$fil = ereg_replace("\\\\(.)","\\1",$cmdline); // replace \x with x
+			swrite($socket, '200 '.md5_file($fil));
+			return;
+		case 'sha1':
+			$fil = ereg_replace("\\\\(.)","\\1",$cmdline); // replace \x with x
+			swrite($socket, '200 '.sha1_file($fil));
+			return;
+		default:
+			swrite($socket, '501 Unknown command');
+			return;
+		#
+	}
+}
+
 function pcmd_dele(&$socket,$cmdline) {
 	// delete a file
 	if (!$socket["logon"]) {
@@ -1184,7 +1218,7 @@ function pcmd_rnfr(&$socket,$cmdline) {
 		return;
 	}
 	$socket["rename_from"]=$fn; // complete path to file
-	swrite($socket,"221 rename ready. Please give destination with RNTO now.");
+	swrite($socket,"350 rename ready. Please give destination with RNTO now.");
 }
 
 function pcmd_rnto(&$socket,$cmdline) {
