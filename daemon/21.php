@@ -836,11 +836,21 @@ function pcmd_site(&$socket,$cmdline) {
 			return;
 		case 'md5':
 			$fil = ereg_replace("\\\\(.)","\\1",$cmdline); // replace \x with x
-			swrite($socket, '200 '.md5_file($fil));
+			$hash = md5_file($fil);
+			if (!$hash) {
+				swrite($socket, '500 Couldn\'t compute hash, make sure file exists and is readable');
+			} else {
+				swrite($socket, '200 '.$hash);
+			}
 			return;
 		case 'sha1':
 			$fil = ereg_replace("\\\\(.)","\\1",$cmdline); // replace \x with x
-			swrite($socket, '200 '.sha1_file($fil));
+			$hash = sha1_file($fil);
+			if (!$hash) {
+				swrite($socket, '500 Couldn\'t compute hash, make sure file exists and is readable');
+			} else {
+				swrite($socket, '200 '.$hash);
+			}
 			return;
 		default:
 			swrite($socket, '501 Unknown command');
