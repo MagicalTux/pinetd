@@ -348,6 +348,7 @@ function pcmd_helo(&$socket,$cmdline,$oldprot=true) {
 		$socket["helo"]=true;
 		$remote=explode(" ",$cmdline);
 		$remote=$remote[1];
+		$socket['helo_str'] = $remote;
 		$real=$socket['remote_host'].' ['.$socket['remote_ip'].']';
 		if ($remote) {
 			$remote=$remote.' ('.$real.')';
@@ -726,7 +727,17 @@ function pcmd_data(&$socket,$cmdline) {
 					$url = $data['account'];
 					$c = '?';
 					if (strpos($url, '?')!==false) $c='&';
-					$url.=$c.'helo='.urlencode($socket['helo']).'&from='.urlencode($socket['mail_from']).'&to='.$data['email'];
+					$adata = array(
+						'helo'=>$socket['helo_str'],
+						'remote_ip'=>$socket['remote_ip'],
+						'remote_host'=>$socket['remote_host'],
+						'from'=>$socket['mail_from'],
+						'to'=>$data['email'],
+					);
+					foreach($adata as $var=>$val) {
+						$url.=$c.$var.'='.urlencode($val);
+						$c='&';
+					}
 					$ch = curl_init($url);
 					curl_setopt($ch, CURLOPT_PUT, true);
 					fseek($wrmail, 0);
