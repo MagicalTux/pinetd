@@ -26,6 +26,12 @@ function make_uniq($subpath,$domain=null,$account=null) {
 	return $path;
 }
 
+function mta_log($str) {
+	$fil = fopen(HOME_DIR.'log/pmaild-'.date('Ymd').'.log','a');
+	fputs($fil, '['.date(DATE_RFC822).'] '.$str."\r\n");
+	fclose($fil);
+}
+
 function main_loop() {
 	global $iterate;
 	// Main loop, called every 1 second
@@ -58,6 +64,7 @@ function check_queue() {
 	$req.= 'WHERE (`next_attempt` > NOW() OR `next_attempt` IS NULL) AND `pid` IS NULL';
 	$res = @mysql_query($req, $sql);
 	if ((!$res) && (!$mta_agents)) {
+		mta_log('Failed to select from table mailqueue: '.mysql_error());
 		@mysql_close($sql);
 		exit(180); // Database not installed?
 	}
@@ -67,6 +74,7 @@ function check_queue() {
 	if ($count==0) return; // nothing to send out, let's go back to sleep
 	$to_start = (int)($count/$pmaild_mta_thread_start_threshold);
 	if ($to_start==0) $to_start=1; // at least 1 server if nothing's running
+	mta_log('Starting '.$to_start.' daemons for mail processing');
 	if ($to_start>$pmaild_mta_max_processes) $to_start=$pmaild_mta_max_processes; // do not go outbound
 	if (count($mta_agents)>=$to_start) return; // we already have the right amount of agents
 	for($i=count($mta_agents);$i<$to_start;$i++) start_mta_agent();
@@ -187,6 +195,7 @@ function core_mta_send_attempt(&$info) {
 			continue;
 		}
 		// OK, mail was delivered !!! YAY!
+		$info['data_reply'] = $msg;
 		fputs($sock, "QUIT\r\n");
 		fgets($sock, 4096); // answer to quit (we don't care about it)
 		fclose($sock);
@@ -216,8 +225,10 @@ function core_mta_agent() {
 	if (mysql_affected_rows($sql)==0) return; // another process got this mail before us
 	// ok, now we know that we're alone on this mail... we have to send it, or restore pid back to null...
 	$info['is_fatal'] = ($pmaild_mta_max_attempt <= $info['attempt_count']); // current "error fatality" state
+	mta_log('Trying to send mail '.$info['mlid'].' to '.$info['to']);
 	if (!core_mta_send_attempt($info)) {
 		// ARGH! Failed!
+		mta_log('Sending mail '.$info['mlid'].' to '.$info['to'].' failed: '.$info['last_error']);
 		if ($info['is_fatal']) {
 			// We'll have to give up on this...
 			if (!is_null($info['from'])) {
@@ -277,6 +288,7 @@ function core_mta_agent() {
 		@mysql_query($req);
 	} else {
 		// the mail was sent, we should delete its record & file
+		mta_log('Sending mail '.$info['mlid'].' to '.$info['to'].' SUCCESS: '.$info['data_reply']);
 		@unlink(PHPMAILD_STORAGE.'/mailqueue/'.$info['mlid']);
 		@mysql_query('DELETE FROM `'.PHPMAILD_DB_NAME.'`.`mailqueue` WHERE `mlid` = \''.mysql_escape_string($info['mlid']).'\'');
 	}
