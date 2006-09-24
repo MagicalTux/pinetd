@@ -418,7 +418,7 @@ function resolve_email(&$socket,$addr) {
 	if ($pos===false) return false;
 	$user = substr($addr,0,$pos);
 	$domain=substr($addr,$pos+1);
-	$req='SELECT domainid, defaultuser, state, flags, antispam, antivirus, dnsbl FROM `'.PHPMAILD_DB_NAME.'`.`domains` WHERE domain=\''.mysql_escape_string($domain).'\'';
+	$req='SELECT domainid, state, flags, antispam, antivirus, dnsbl FROM `'.PHPMAILD_DB_NAME.'`.`domains` WHERE domain=\''.mysql_escape_string($domain).'\'';
 	$res=@mysql_query($req);
 	$res=@mysql_fetch_assoc($res);
 	if (!$res) return false;
@@ -458,6 +458,12 @@ function resolve_email(&$socket,$addr) {
 		$req='SELECT `real_target`, `http_target`, `id` FROM '.$p.'alias` WHERE user=\''.mysql_escape_string($user).'\'';
 		$res=@mysql_query($req);
 		$res=@mysql_fetch_assoc($res);
+		if ((!$res) && (array_search('create_account_on_mail',$domain_data['flags'])===false)) {
+			// no alias found, and no create_account_on_mail... check for "default" alias
+			$req='SELECT `real_target`, `http_target`, `id` FROM '.$p.'alias` WHERE user=\'default\'';
+			$res=@mysql_query($req);
+			$res=@mysql_fetch_assoc($res);
+		}
 		if ($res) {
 			$account_id=$res['real_target'];
 			if (!is_null($res['http_target'])) {
@@ -474,13 +480,8 @@ function resolve_email(&$socket,$addr) {
 				if (!@mysql_query($req)) return '450 Temporary error in domain name. Please check SQL state.';
 				$account_id=mysql_insert_id();
 			} else {
-				// check for defaultuser
-				if (!is_null($domain_data['defaultuser'])) {
-					$account_id=$domain_data['defaultuser'];
-				} else {
-					// no mailbox found !
-					return '500 Mailbox not found';
-				}
+				// no mailbox found !
+				return '500 Mailbox not found';
 			}
 		}
 	} else {
