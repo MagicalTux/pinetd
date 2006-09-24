@@ -8,6 +8,24 @@
 $iterate=1;
 $mta_agents = array();
 
+function make_uniq($subpath,$domain=null,$account=null) {
+	global $servername;
+	// make uniq filename in
+	// PHPMAILD_STORAGE/$subpath/
+	$path=PHPMAILD_STORAGE.'/'.$subpath;
+	if (!is_null($domain)) $path.='/'.substr($domain,-1).'/'.substr($domain,-2).'/'.$domain;
+	if (!is_null($account)) {
+		$acc=dechex($account);
+		while(strlen($acc)<4) $acc='0'.$acc;
+		$path.='/'.substr($acc,-1).'/'.substr($acc,-2).'/'.$acc;
+	}
+	if (!is_dir($path)) mkdir($path, 0755, true);
+	$path.='/';
+	$tmp=explode(' ',microtime());
+	$path.=$tmp[1].'.'.substr($tmp[0],2).'.'.code(5).getmypid().'.'.$servername;
+	return $path;
+}
+
 function main_loop() {
 	global $iterate;
 	// Main loop, called every 1 second
@@ -178,7 +196,7 @@ function core_mta_send_attempt(&$info) {
 }
 
 function core_mta_agent() {
-	global $pmaild_mta_max_attempt, $pmaild_mta_mail_max_lifetime;
+	global $pmaild_mta_max_attempt, $pmaild_mta_mail_max_lifetime, $servername;
 	$sql = getsql();
 	// Select a mail that needs to be sent
 	$req = 'SELECT `mlid`, `from`, `to`, UNIX_TIMESTAMP(`queued`) AS `queued`, `attempt_count`, UNIX_TIMESTAMP(`last_attempt`) AS `last_attempt`, `last_error` ';
@@ -200,7 +218,45 @@ function core_mta_agent() {
 	$info['is_fatal'] = ($pmaild_mta_max_attempt <= $info['attempt_count']); // current "error fatality" state
 	if (!core_mta_send_attempt($info)) {
 		// ARGH! Failed!
-		// TODO: Implement check if is_fatal, and act properly
+		if ($info['is_fatal']) {
+			// We'll have to give up on this...
+			if (!is_null($info['from'])) {
+				// Reverse the mail, and send it back to the sender
+				$out = make_uniq('mailqueue');
+				$fil = fopen($out, 'w');
+				$in = fopen(PHPMAILD_STORAGE.'/mailqueue/'.$info['mlid'], 'r');
+				fputs($fil, 'Message-ID: <'.basename($out).'@'.$servername.">\r\n");
+				fputs($fil, 'Date: '.date(DATE_RFC822)."\r\n");
+				fputs($fil, 'From: MAILER-DAEMON <mailer-daemon@'.$servername.">\r\n");
+				fputs($fil, 'User-Agent: pMaild 1.0'."\r\n");
+				fputs($fil, 'To: '.$info['from']."\r\n");
+				fputs($fil, 'Subject: Failed attempt to send email'."\r\n");
+				fputs($fil, "\r\n");
+				fputs($fil, "Hello,\r\n\r\nHere is the mailer daemon at $servername. I'm sorry\r\n");
+				fputs($fil, "I couldn't transmit your mail. This is a fatal error, so I gave up\r\n\r\n");
+				fputs($fil, "Here are some details about the error:\r\n");
+				fputs($fil, '  '.$info['last_error']."\r\n\r\n");
+				fputs($fil, "And here are the headers of your mail, for reference:\r\n");
+				if ($in) {
+					while(!feof($in)) {
+						$lin = fgets($in, 4096);
+						$lin = rtrim($lin);
+						if ($lin=='') break; // end of headers
+						fputs($fil, $lin."\r\n");
+					}
+				}
+				fclose($in);
+				fclose($fil);
+				$req = 'INSERT INTO `'.PHPMAILD_DB_NAME.'`.`mailqueue` SET ';
+				$req.= '`mlid` = \''.mysql_escape_string(basename($out)).'\', `to` = \''.mysql_escape_string($info['from']).'\', ';
+				$req.= '`queued` = NOW()';
+				@mysql_query($req);
+			}
+			// delete the mail we tried to send
+			@unlink(PHPMAILD_STORAGE.'/mailqueue/'.$info['mlid']);
+			@mysql_query('DELETE FROM `'.PHPMAILD_DB_NAME.'`.`mailqueue` WHERE `mlid` = \''.mysql_escape_string($info['mlid']).'\'');
+			return;
+		}
 		if (is_null($info['last_attempt'])) {
 			// special case, we'll retry in 2 minutes~
 			$req = 'UPDATE `'.PHPMAILD_DB_NAME.'`.`mailqueue` SET ';
