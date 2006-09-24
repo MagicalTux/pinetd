@@ -459,7 +459,11 @@ function resolve_email(&$socket,$addr) {
 		$res=@mysql_fetch_assoc($res);
 		if ($res) {
 			$account_id=$res['real_target'];
-			if (!is_null($res['http_target'])) $account_id = $res['http_target'];
+			if (!is_null($res['http_target'])) {
+				$account_id = $res['http_target'];
+				if (count($socket['mail_to'])>0) return '400 Please provide only ONE RCPT TO';
+				$domain_antispam=true;
+			}
 			$req = 'UPDATE '.$p.'alias` SET `last_transit`=NOW() WHERE id=\''.mysql_escape_string($res['id']).'\'';
 			@mysql_query($req);
 		} else {
@@ -717,8 +721,8 @@ function pcmd_data(&$socket,$cmdline) {
 					unlink($filename);
 					return;
 				}
+				// Special delivery to HTTP server
 				if (substr($data['account'], 0, 4)=='http') {
-					// Special delivery to HTTP server
 					$url = $data['account'];
 					$c = '?';
 					if (strpos($url, '?')!==false) $c='&';
@@ -735,7 +739,12 @@ function pcmd_data(&$socket,$cmdline) {
 					} else {
 						swrite($socket, $res);
 					}
-					continue;
+					if (isset($socket["mail_from"])) unset($socket["mail_from"]);
+					if (isset($socket["mail_to"])) unset($socket["mail_to"]);
+					if (isset($socket['antispam'])) unset($socket['antispam']);
+					fclose($wrmail);
+					unlink($filename);
+					return;
 				}
 				// Local delivery
 				$target=make_uniq('domains',$data['domain'],$data['account']);
