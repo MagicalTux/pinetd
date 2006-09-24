@@ -97,7 +97,13 @@ function proto_welcome(&$socket) {
 	global $servername;
 	if (!function_exists('mb_convert_encoding')) {
 		swrite($socket, '* NO mb_string extension missing in installation, IMAP not working');
-		return;
+		sclose($socket);
+		exit;
+	}
+	if (!$socket['mysql']) {
+		swrite($socket, '* NO Database backend not available, please try again later');
+		sclose($socket);
+		exit;
 	}
 	$socket["log_fp"]=fopen(HOME_DIR."log/imap4-".date("Ymd-His")."-".$socket["remote_ip"].'-'.getmypid().".log","w");
 	fputs($socket["log_fp"],"Client : ".$socket["remote_ip"].":".$socket["remote_port"]." connected.\r\n");

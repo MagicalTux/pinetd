@@ -31,6 +31,11 @@ define('PHPMAILD_DB_NAME','phpinetd-maild');
 // pmaild : max processes count for sending outgoing emails
 $pmaild_mta_max_processes = 5;
 $pmaild_mta_thread_start_threshold = 5; // start 1 thread each 5 mails to send
+$pmaild_mta_max_attempt = 10; // Number of attempts to send an outgoing email
+$pmaild_mta_mail_max_lifetime = 48; // Max lifetime (in hours) of an email
+// The system will try X times to send the email during Y hours. The two first
+// attempts will be followed  by ~2 minutes, if the remote server has some difficulties
+// accepting mail, or is running greylisting.
 
 // SSL specific
 // Read documentation there :
@@ -53,8 +58,6 @@ $ssl_settings = array(
 			'allow_self_signed' => true,
 			'local_cert' => HOME_DIR.'ssl/newkey.pem',
 //			'passphrase' => '', // passphrase for certificate
-		),
-	),
 		),
 	),
 );
