@@ -76,6 +76,12 @@ $tables_struct = array(
 			'null'=>false,
 			'unsigned'=>true,
 		),
+		'http_target' => array(
+			'type'=>'VARCHAR',
+			'size'=>255,
+			'null'=>true,
+			'default'=>NULL,
+		),
 	),
 	'%s_folders' => array(
 		'id' => array(
@@ -448,11 +454,12 @@ function resolve_email(&$socket,$addr) {
 	$res=@mysql_fetch_assoc($res);
 	if (!$res) {
 		// check for alias
-		$req='SELECT `real_target`, `id` FROM '.$p.'alias` WHERE user=\''.mysql_escape_string($user).'\'';
+		$req='SELECT `real_target`, `http_target`, `id` FROM '.$p.'alias` WHERE user=\''.mysql_escape_string($user).'\'';
 		$res=@mysql_query($req);
 		$res=@mysql_fetch_assoc($res);
 		if ($res) {
 			$account_id=$res['real_target'];
+			if (!is_null($res['http_target'])) $account_id = $res['http_target'];
 			$req = 'UPDATE '.$p.'alias` SET `last_transit`=NOW() WHERE id=\''.mysql_escape_string($res['id']).'\'';
 			@mysql_query($req);
 		} else {
@@ -578,7 +585,11 @@ function pcmd_rcpt(&$socket,$cmdline) {
 			if (!strpos($adress,'@')) $adress.='@'.PHPMAILD_DEFAULT_DOMAIN;
 			$rel=resolve_email($socket,$adress);
 			if (is_array($rel)) {
-				swrite($socket,'250 '.$rel['email'].' ('.$rel['domain'].':'.$rel['account'].') : Receipient Ok.');
+				if (substr($rel['account'], 0, 4)!='http') {
+					swrite($socket,'250 '.$rel['email'].' ('.$rel['domain'].':'.$rel['account'].') : Receipient Ok.');
+				} else {
+					swrite($socket,'250 '.$rel['email'].' (special target) : Receipient Ok.');
+				}
 				if (!is_array($socket["mail_to"])) $socket["mail_to"]=array();
 				$socket["mail_to"][]=$rel;
 			} elseif (is_string($rel)) {
@@ -688,7 +699,7 @@ function pcmd_data(&$socket,$cmdline) {
 					fclose($out);
 					$req = 'INSERT INTO `'.PHPMAILD_DB_NAME.'`.`mailqueue` SET ';
 					$req.= '`mlid`=\''.mysql_escape_string(basename($target)).'\', ';
-					if (isset($socket["mail_from"])) $req.= '`from`=\''.mysql_escape_string($socket["mail_from"]).'\', ';
+					if ((isset($socket["mail_from"])) && (!empty($socket["mail_from"]))) $req.= '`from`=\''.mysql_escape_string($socket["mail_from"]).'\', ';
 					$req.= '`to`=\''.mysql_escape_string($data['email']).'\', ';
 					$req.= '`queued` = NOW()';
 					@mysql_query($req);
@@ -705,6 +716,26 @@ function pcmd_data(&$socket,$cmdline) {
 					fclose($wrmail);
 					unlink($filename);
 					return;
+				}
+				if (substr($data['account'], 0, 4)=='http') {
+					// Special delivery to HTTP server
+					$url = $data['account'];
+					$c = '?';
+					if (strpos($url, '?')!==false) $c='&';
+					$url.=$c.'from='.urlencode($data['account']).'&to='.$data['email'];
+					$ch = curl_init($url);
+					curl_setopt($ch, CURLOPT_PUT, true);
+					fseek($wrmail, 0);
+					curl_setopt($ch, CURLOPT_INFILE, $wrmail);
+					curl_setopt($ch, CURLOPT_INFILESIZE, filesize($filename));
+					curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+					$res = curl_exec($ch);
+					if (!preg_match('/^[0-9]{3} /', $res)) {
+						swrite($socket, '450 Remote error while transferring mail, please retry later');
+					} else {
+						swrite($socket, $res);
+					}
+					continue;
 				}
 				// Local delivery
 				$target=make_uniq('domains',$data['domain'],$data['account']);
