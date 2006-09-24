@@ -228,6 +228,7 @@ function core_mta_agent() {
 	mta_log('Trying to send mail '.$info['mlid'].' to '.$info['to']);
 	if (!core_mta_send_attempt($info)) {
 		// ARGH! Failed!
+		$info['last_error'] = rtrim($info['last_error']);
 		mta_log('Sending mail '.$info['mlid'].' to '.$info['to'].' failed: '.$info['last_error']);
 		if ($info['is_fatal']) {
 			// We'll have to give up on this...
