@@ -248,7 +248,7 @@ function core_mta_agent() {
 				fputs($fil, "I couldn't transmit your mail. This is a fatal error, so I gave up\r\n\r\n");
 				fputs($fil, "Here are some details about the error:\r\n");
 				fputs($fil, '  '.$info['last_error']."\r\n\r\n");
-				fputs($fil, "And here are the headers of your mail, for reference:\r\n");
+				fputs($fil, "And here are the headers of your mail, for reference:\r\n\r\n");
 				if ($in) {
 					while(!feof($in)) {
 						$lin = fgets($in, 4096);
