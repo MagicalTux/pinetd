@@ -74,9 +74,9 @@ function check_queue() {
 	if ($count==0) return; // nothing to send out, let's go back to sleep
 	$to_start = (int)($count/$pmaild_mta_thread_start_threshold);
 	if ($to_start==0) $to_start=1; // at least 1 server if nothing's running
-	mta_log('Starting '.$to_start.' daemons for mail processing');
 	if ($to_start>$pmaild_mta_max_processes) $to_start=$pmaild_mta_max_processes; // do not go outbound
 	if (count($mta_agents)>=$to_start) return; // we already have the right amount of agents
+	mta_log('Starting '.($to_start-count($mta_agents)).' daemon(s) for processing of '.$count.' mails');
 	for($i=count($mta_agents);$i<$to_start;$i++) start_mta_agent();
 }
 
@@ -288,7 +288,7 @@ function core_mta_agent() {
 		@mysql_query($req);
 	} else {
 		// the mail was sent, we should delete its record & file
-		mta_log('Sending mail '.$info['mlid'].' to '.$info['to'].' SUCCESS: '.$info['data_reply']);
+		mta_log('Sending mail '.$info['mlid'].' to '.$info['to'].' SUCCESS: '.rtrim($info['data_reply']));
 		@unlink(PHPMAILD_STORAGE.'/mailqueue/'.$info['mlid']);
 		@mysql_query('DELETE FROM `'.PHPMAILD_DB_NAME.'`.`mailqueue` WHERE `mlid` = \''.mysql_escape_string($info['mlid']).'\'');
 	}
