@@ -726,7 +726,7 @@ function pcmd_data(&$socket,$cmdline) {
 					$url = $data['account'];
 					$c = '?';
 					if (strpos($url, '?')!==false) $c='&';
-					$url.=$c.'from='.urlencode($socket['mail_from']).'&to='.$data['email'];
+					$url.=$c.'helo='.urlencode($socket['helo']).'&from='.urlencode($socket['mail_from']).'&to='.$data['email'];
 					$ch = curl_init($url);
 					curl_setopt($ch, CURLOPT_PUT, true);
 					fseek($wrmail, 0);
