@@ -278,7 +278,15 @@ function core_mta_agent() {
 			$req.= 'WHERE `mlid` = \''.mysql_escape_string($info['mlid']).'\'';
 		} else {
 			// compute next attempt time...
-			$next_attempt = time() + (($pmaild_mta_mail_max_lifetime/$pmaild_mta_max_attempt) * 3600);
+//			$next_attempt = time() + (($pmaild_mta_mail_max_lifetime*3600)/$pmaild_mta_max_attempt);
+			// Generate a nice time curve, using sin()
+			$next_attempt = (($pmaild_mta_mail_max_lifetime*3600)/$pmaild_mta_max_attempt) * sin(M_PI_2*(float)$info['attempt_count']/(float)$pmaild_mta_max_attempt);
+			if ($next_attempt < 30) $next_attempt = 30;
+			if ($next_attempt > (3600*8)) {
+				mta_log('Warning, computed next attempt ('.$next_attempt.') is in more than 8H. Consider increasing pmaild_mta_max_attempt');
+				$next_attempt = (3600*8);
+			}
+			$next_attempt += time(); // relative to current time
 			$req = 'UPDATE `'.PHPMAILD_DB_NAME.'`.`mailqueue` SET ';
 			$req.= '`next_attempt` = FROM_UNIXTIME('.$next_attempt.'), `pid` = NULL, ';
 			$req.= '`last_attempt` = NOW(), ';
