@@ -225,7 +225,7 @@ function core_mta_agent() {
 	if (mysql_affected_rows($sql)==0) return; // another process got this mail before us
 	// ok, now we know that we're alone on this mail... we have to send it, or restore pid back to null...
 	$info['is_fatal'] = ($pmaild_mta_max_attempt <= $info['attempt_count']); // current "error fatality" state
-	mta_log('Trying to send mail '.$info['mlid'].' to '.$info['to']);
+	mta_log('Trying to send mail '.$info['mlid'].' to '.$info['to'].' (attempt #'.$info['attempt_count'].' - fail on warn: '.$info['is_fatal'].')');
 	if (!core_mta_send_attempt($info)) {
 		// ARGH! Failed!
 		$info['last_error'] = rtrim($info['last_error']);
