@@ -513,14 +513,18 @@ function dnsbl_check(&$socket, &$trust, $dnsbl) {
 	$req = 'DELETE FROM `'.PHPMAILD_DB_NAME.'`.`dnsbl_cache` WHERE `regdate` < DATE_SUB(NOW(), INTERVAL 1 DAY)';
 	@mysql_query($req);
 	// check for relaying
-	$req = 'SELECT 1 FROM `'.PHPMAILD_DB_NAME.'`.`hosts` ';
+	$req = 'SELECT `type` FROM `'.PHPMAILD_DB_NAME.'`.`hosts` ';
 	$req.= 'WHERE `ip` = \''.mysql_escape_string($ip).'\' ';
 	$req.= 'AND `type` = \'trust\' AND (`expires` > NOW() OR `expires` IS NULL) ';
 	$res = @mysql_query($req);
 	$res = @mysql_fetch_row($res);
 	if ($res) {
-		$trust = true;
-		return false; // trusted ip
+		if ($res[0]=='trust') {
+			$trust = true;
+			return false; // trusted ip
+		} else {
+			return '400 Your host is blocked by internal dynamic rule.';
+		}
 	}
 	$rev_ip = implode('.', array_reverse(explode('.', $ip)));
 	foreach($dnsbl as $bl) {
