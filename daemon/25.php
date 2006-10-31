@@ -515,7 +515,7 @@ function dnsbl_check(&$socket, &$trust, $dnsbl) {
 	// check for relaying
 	$req = 'SELECT `type` FROM `'.PHPMAILD_DB_NAME.'`.`hosts` ';
 	$req.= 'WHERE `ip` = \''.mysql_escape_string($ip).'\' ';
-	$req.= 'AND `type` = \'trust\' AND (`expires` > NOW() OR `expires` IS NULL) ';
+	$req.= 'AND (`expires` > NOW() OR `expires` IS NULL) ';
 	$res = @mysql_query($req);
 	$res = @mysql_fetch_row($res);
 	if ($res) {
