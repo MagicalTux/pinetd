@@ -76,6 +76,12 @@ $tables_struct = array(
 			'null'=>false,
 			'unsigned'=>true,
 		),
+		'mail_target' => array(
+			'type'=>'VARCHAR',
+			'size'=>255,
+			'null'=>true,
+			'default'=>NULL,
+		),
 		'http_target' => array(
 			'type'=>'VARCHAR',
 			'size'=>255,
@@ -449,13 +455,13 @@ function resolve_email(&$socket,$addr) {
 	$domain_data=$res;
 	// table prefix
 	$p='`'.PHPMAILD_DB_NAME.'`.`z'.$res['domainid'].'_';
-	// check for account
-	$req='SELECT id FROM '.$p.'accounts` WHERE user=\''.mysql_escape_string($user).'\'';
+	// check for alias
+	$req='SELECT `real_target`, `http_target`, `mail_target`, `id` FROM '.$p.'alias` WHERE user=\''.mysql_escape_string($user).'\'';
 	$res=@mysql_query($req);
 	$res=@mysql_fetch_assoc($res);
 	if (!$res) {
-		// check for alias
-		$req='SELECT `real_target`, `http_target`, `id` FROM '.$p.'alias` WHERE user=\''.mysql_escape_string($user).'\'';
+		// check for account
+		$req='SELECT id FROM '.$p.'accounts` WHERE user=\''.mysql_escape_string($user).'\'';
 		$res=@mysql_query($req);
 		$res=@mysql_fetch_assoc($res);
 		if ((!$res) && (array_search('create_account_on_mail',$domain_data['flags'])===false)) {
@@ -465,19 +471,12 @@ function resolve_email(&$socket,$addr) {
 			$res=@mysql_fetch_assoc($res);
 		}
 		if ($res) {
-			$account_id=$res['real_target'];
-			if (!is_null($res['http_target'])) {
-				$account_id = $res['http_target'];
-				if (count($socket['mail_to'])>0) return '400 Please provide only ONE RCPT TO';
-				$domain_antispam=true;
-			}
-			$req = 'UPDATE '.$p.'alias` SET `last_transit`=NOW() WHERE id=\''.mysql_escape_string($res['id']).'\'';
-			@mysql_query($req);
+			$account_id=$res['id'];
 		} else {
 			// check for create_account_on_mail
 			if (array_search('create_account_on_mail',$domain_data['flags'])!==false) {
 				$req='INSERT INTO '.$p.'accounts` SET user=\''.mysql_escape_string($user).'\', password=NULL';
-				if (!@mysql_query($req)) return '450 Temporary error in domain name. Please check SQL state.';
+				if (!@mysql_query($req)) return '450 Temporary database error. Please try again later.';
 				$account_id=mysql_insert_id();
 			} else {
 				// no mailbox found !
@@ -485,15 +484,35 @@ function resolve_email(&$socket,$addr) {
 			}
 		}
 	} else {
-		$account_id=$res['id'];
+		$account_id=$res['real_target'];
+		if (!is_null($res['http_target'])) {
+			$account_id = $res['http_target'];
+			if (count($socket['mail_to'])>0) return '400 Please provide only ONE RCPT TO';
+			$domain_antispam=true;
+		}
+		if (!is_null($res['mail_target'])) { // force relaying to specified address - this is an external alias
+			$account_id = array(
+				'account'=>null,
+				'origin'=>$user.'@'.$domain,
+				'email'=>$res['mail_target'],
+			);
+			if (count($socket['mail_to'])>0) return '400 Please provide only ONE RCPT TO';
+			$domain_antispam=true;
+		}
+		$req = 'UPDATE '.$p.'alias` SET `last_transit`=NOW() WHERE id=\''.mysql_escape_string($res['id']).'\'';
+		@mysql_query($req);
 	}
-	$res=array(
-		'account'=>$account_id,
-		'domain'=>$domain_data['domainid'],
-		'domain_data'=>$domain_data,
-		'email'=>$user.'@'.$domain,
-		'headers'=>'Delivered-To: <'.$user.'@'.$domain.'>'."\r\n",
-	);
+	if (is_array($account_id)) {
+		$res = $account_id;
+	} else {
+		$res=array(
+			'account'=>$account_id,
+			'domain'=>$domain_data['domainid'],
+			'domain_data'=>$domain_data,
+			'email'=>$user.'@'.$domain,
+			'headers'=>'Delivered-To: <'.$user.'@'.$domain.'>'."\r\n",
+		);
+	}
 	$req = 'UPDATE `'.PHPMAILD_DB_NAME.'`.`domains` SET `last_recv`=NOW() WHERE `domainid` = \''.mysql_escape_string($domain_data['domainid']).'\'';
 	@mysql_query($req);
 	$socket['antispam']=$domain_antispam;
@@ -595,7 +614,9 @@ function pcmd_rcpt(&$socket,$cmdline) {
 			if (!strpos($adress,'@')) $adress.='@'.PHPMAILD_DEFAULT_DOMAIN;
 			$rel=resolve_email($socket,$adress);
 			if (is_array($rel)) {
-				if (substr($rel['account'], 0, 4)!='http') {
+				if (is_null($rel['account'])) {
+					swrite($socket,'250 '.$rel['email'].' (special target) : Receipient Ok.');
+				} elseif (substr($rel['account'], 0, 4)!='http') {
 					swrite($socket,'250 '.$rel['email'].' ('.$rel['domain'].':'.$rel['account'].') : Receipient Ok.');
 				} else {
 					swrite($socket,'250 '.$rel['email'].' (special target) : Receipient Ok.');
