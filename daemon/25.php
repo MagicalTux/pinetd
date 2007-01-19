@@ -615,7 +615,7 @@ function pcmd_rcpt(&$socket,$cmdline) {
 			$rel=resolve_email($socket,$adress);
 			if (is_array($rel)) {
 				if (is_null($rel['account'])) {
-					swrite($socket,'250 '.$rel['email'].' (special target) : Receipient Ok.');
+					swrite($socket,'250 '.$rel['origin'].' (special target) : Receipient Ok.');
 				} elseif (substr($rel['account'], 0, 4)!='http') {
 					swrite($socket,'250 '.$rel['email'].' ('.$rel['domain'].':'.$rel['account'].') : Receipient Ok.');
 				} else {
