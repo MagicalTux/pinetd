@@ -470,19 +470,20 @@ function resolve_email(&$socket,$addr) {
 			$res=@mysql_query($req);
 			$res=@mysql_fetch_assoc($res);
 		}
-		if ($res) {
-			$account_id=$res['id'];
-		} else {
+		if (!$res) {
 			// check for create_account_on_mail
 			if (array_search('create_account_on_mail',$domain_data['flags'])!==false) {
 				$req='INSERT INTO '.$p.'accounts` SET user=\''.mysql_escape_string($user).'\', password=NULL';
 				if (!@mysql_query($req)) return '450 Temporary database error. Please try again later.';
-				$account_id=mysql_insert_id();
+				$res=array('id'=>mysql_insert_id());
 			} else {
 				// no mailbox found !
 				return '500 Mailbox not found';
 			}
 		}
+	}
+	if (!isset($res['real_target'])) {
+		$account_id=$res['id'];
 	} else {
 		$account_id=$res['real_target'];
 		if (!is_null($res['http_target'])) {
