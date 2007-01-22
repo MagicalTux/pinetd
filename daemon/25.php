@@ -42,6 +42,12 @@ $tables_struct = array(
 			'null'=>true,
 			'default'=>NULL,
 		),
+		'mail_count' => array(
+			'type'=>'INT',
+			'size'=>10,
+			'null'=>true,
+			'unsigned'=>true,
+		),
 		'redirect'=>array(
 			'type'=>'VARCHAR',
 			'size'=>255,
