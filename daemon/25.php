@@ -424,13 +424,27 @@ function pcmd_mail(&$socket,$cmdline) {
 	}
 }
 
+// This function will manage email's routing
+//
+// Really important function!!
+
 function resolve_email(&$socket,$addr) {
 	if (isset($socket['antispam'])) return '400 Please provide only ONE RCPT TO';
 	$pos=strrpos($addr,'@');
 	if ($pos===false) return false;
 	$user = substr($addr,0,$pos);
 	$domain=substr($addr,$pos+1);
-	$req='SELECT domainid, state, flags, antispam, antivirus, dnsbl FROM `'.PHPMAILD_DB_NAME.'`.`domains` WHERE domain=\''.mysql_escape_string($domain).'\'';
+	$domainalias = null;
+	// First, check for a domainalias
+	$req = 'SELECT domainid FROM `'.PHPMAILD_DB_NAME.'`.`domainaliases` WHERE domain=\''.mysql_escape_string($domain).'\'';
+	$res = @mysql_query($req);
+	$res = @mysql_fetch_row($res);
+	if ($res) {
+		$req='SELECT domainid, state, flags, antispam, antivirus, dnsbl FROM `'.PHPMAILD_DB_NAME.'`.`domains` WHERE domainid=\''.mysql_escape_string($res[0]).'\'';
+		$domainalias = $domain;
+	} else {
+		$req='SELECT domainid, state, flags, antispam, antivirus, dnsbl FROM `'.PHPMAILD_DB_NAME.'`.`domains` WHERE domain=\''.mysql_escape_string($domain).'\'';
+	}
 	$res=@mysql_query($req);
 	$res=@mysql_fetch_assoc($res);
 	if (!$res) return false;
@@ -461,6 +475,7 @@ function resolve_email(&$socket,$addr) {
 	$domain_data=$res;
 	// table prefix
 	$p='`'.PHPMAILD_DB_NAME.'`.`z'.$res['domainid'].'_';
+	// ***** Resolve code (1st pass)
 	// check for alias
 	$req='SELECT `real_target`, `http_target`, `mail_target`, `id` FROM '.$p.'alias` WHERE user=\''.mysql_escape_string($user).'\'';
 	$res=@mysql_query($req);
@@ -488,6 +503,7 @@ function resolve_email(&$socket,$addr) {
 			}
 		}
 	}
+	// ***** Specific resolve code (2nd pass)
 	if (!isset($res['real_target'])) {
 		$account_id=$res['id'];
 	} else {
@@ -509,6 +525,7 @@ function resolve_email(&$socket,$addr) {
 		$req = 'UPDATE '.$p.'alias` SET `last_transit`=NOW() WHERE id=\''.mysql_escape_string($res['id']).'\'';
 		@mysql_query($req);
 	}
+	// ***** 3rd pass
 	if (is_array($account_id)) {
 		$res = $account_id;
 	} else {
@@ -520,7 +537,12 @@ function resolve_email(&$socket,$addr) {
 			'headers'=>'Delivered-To: <'.$user.'@'.$domain.'>'."\r\n",
 		);
 	}
-	$req = 'UPDATE `'.PHPMAILD_DB_NAME.'`.`domains` SET `last_recv`=NOW() WHERE `domainid` = \''.mysql_escape_string($domain_data['domainid']).'\'';
+	// if domain was in fact a domainalias, update alias's last_recv
+	if (!is_null($domainalias)) {
+		$req = 'UPDATE `'.PHPMAILD_DB_NAME.'`.`domainaliases` SET `last_recv`=NOW() WHERE `domain` = \''.mysql_escape_string($domainalias).'\'';
+	} else { // if not, update domain's last_recv
+		$req = 'UPDATE `'.PHPMAILD_DB_NAME.'`.`domains` SET `last_recv`=NOW() WHERE `domainid` = \''.mysql_escape_string($domain_data['domainid']).'\'';
+	}
 	@mysql_query($req);
 	$socket['antispam']=$domain_antispam;
 	return $res;
