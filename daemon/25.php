@@ -476,6 +476,13 @@ function resolve_email(&$socket,$addr) {
 	// table prefix
 	$p='`'.PHPMAILD_DB_NAME.'`.`z'.$res['domainid'].'_';
 	// ***** Resolve code (1st pass)
+	// Check if mail has a + in it (and if flag is enabled)
+	if (array_search('account_without_plus_symbol', $domain_data['flags'])!==false) {
+		$pos = strpos($user, '+');
+		if ($pos !== false) {
+			$user = substr($user, 0, $pos);
+		}
+	}
 	// check for alias
 	$req='SELECT `real_target`, `http_target`, `mail_target`, `id` FROM '.$p.'alias` WHERE user=\''.mysql_escape_string($user).'\'';
 	$res=@mysql_query($req);
