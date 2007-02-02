@@ -516,11 +516,15 @@ function resolve_email(&$socket,$addr) {
 	} else {
 		$account_id=$res['real_target'];
 		if (!is_null($res['http_target'])) {
-			$account_id = $res['http_target'];
+			$account_id = array(
+				'account'=>$res['http_target'],
+				'on_error'=>$res['mail_target'],
+				'email'=>$user.'@'.$domain,
+				'headers'=>'Received: Mail to HTTP gateway (pinetd)'."\r\n",
+			);
 			if (count($socket['mail_to'])>0) return '400 Please provide only ONE RCPT TO';
 			$domain_antispam=true;
-		}
-		if (!is_null($res['mail_target'])) { // force relaying to specified address - this is an external alias
+		} elseif (!is_null($res['mail_target'])) { // force relaying to specified address - this is an external alias
 			$account_id = array(
 				'account'=>null,
 				'origin'=>$user.'@'.$domain,
@@ -809,6 +813,9 @@ function pcmd_data(&$socket,$cmdline) {
 					$res = curl_exec($ch);
 					if (!preg_match('/^[0-9]{3} /', $res)) {
 						swrite($socket, '450 Remote error while transferring mail, please retry later');
+						if (!is_null($data['on_error'])) {
+							mail($data['on_error'], 'Error at '.$data['email'], $res, 'From: "Mail Script Caller" <nobody@example.com>');
+						}
 					} else {
 						swrite($socket, $res);
 					}
