@@ -810,7 +810,12 @@ function pcmd_data(&$socket,$cmdline) {
 					curl_setopt($ch, CURLOPT_INFILE, $wrmail);
 					curl_setopt($ch, CURLOPT_INFILESIZE, filesize($filename));
 					curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-					$res = curl_exec($ch);
+					$res = curl_exec($ch); // called script *must* return a message starting with 3 numbers, then a status message
+					// Valid status answers :
+					// 250 : Mail accepted, no need for anything more
+					// 4xx : Temporary error, try again later (mail may be bounced after a while)
+					// 5xx : Fatal error, should not retry (mail will be bounced)
+					// If that's not the case, we'll just return a temporary error on our own.
 					if (!preg_match('/^[0-9]{3} /', $res)) {
 						swrite($socket, '450 Remote error while transferring mail, please retry later');
 						if (!is_null($data['on_error'])) {

@@ -139,7 +139,7 @@ function ucmd_noop(&$socket, $cmdline, $id) {
 
 function pcmd_capability(&$socket, $cmdline, $id) {
 	swrite($socket, '* CAPABILITY IMAP4REV1 X-NETSCAPE NAMESPACE MAILBOX-REFERRALS SCAN SORT THREAD=REFERENCES THREAD=ORDEREDSUBJECT MULTIAPPEND LOGIN-REFERRALS AUTH=LOGIN');
-	// * CAPABILITY IMAP4REV1 X-NETSCAPE NAMESPACE MAILBOX-REFERRALS SCAN SORT THREAD=R EFERENCES THREAD=ORDEREDSUBJECT MULTIAPPEND LOGIN-REFERRALS AUTH=LOGIN
+	// * CAPABILITY IMAP4REV1 X-NETSCAPE NAMESPACE MAILBOX-REFERRALS SCAN SORT THREAD=REFERENCES THREAD=ORDEREDSUBJECT MULTIAPPEND LOGIN-REFERRALS AUTH=LOGIN
 //	B00000 OK CAPABILITY completed
 	swrite($socket, $id.' OK CAPABILITY completed');
 }
@@ -153,7 +153,8 @@ function ucmd_namespace(&$socket, $cmdline, $id) {
 	// * NAMESPACE (("" "/")("#mhinbox" NIL)("#mh/" "/")) (("~" "/")) (("#shared/" "/")("#ftp/" "/")("#news." ".")("#public/" "/"))
 //	A OK NAMESPACE completed
 	// TODO: find some documentation and adapt this function
-	swrite($socket, '* NAMESPACE (("" "/")("#mhinbox" NIL)("#mh/" "/")) (("~" "/")) (("#shared/" "/")("#ftp/" "/")("#news." ".")("#public/" "/"))');
+	// Documentation for namespaces : RFC2342
+	swrite($socket, '* NAMESPACE (("" "/")) NIL NIL');
 	swrite($socket, $id.' OK NAMESPACE completed');
 }
 
