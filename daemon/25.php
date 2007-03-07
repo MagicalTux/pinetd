@@ -494,7 +494,7 @@ function resolve_email(&$socket,$addr) {
 		$res=@mysql_fetch_assoc($res);
 		if ((!$res) && (array_search('create_account_on_mail',$domain_data['flags'])===false)) {
 			// no alias found, and no create_account_on_mail... check for "default" alias
-			$req='SELECT `real_target`, `http_target`, `id` FROM '.$p.'alias` WHERE user=\'default\'';
+			$req='SELECT `real_target`, `http_target`, `mail_target`, `id` FROM '.$p.'alias` WHERE user=\'default\'';
 			$res=@mysql_query($req);
 			$res=@mysql_fetch_assoc($res);
 		}
