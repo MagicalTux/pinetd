@@ -525,6 +525,8 @@ function resolve_email(&$socket,$addr) {
 			if (count($socket['mail_to'])>0) return '400 Please provide only ONE RCPT TO';
 			$domain_antispam=true;
 		} elseif (!is_null($res['mail_target'])) { // force relaying to specified address - this is an external alias
+			// Special case: if mail start with @, prepend with original username
+			if (substr($res['mail_target'], 0, 1) == '@') $res['mail_target'] = $user . $res['mail_target'];
 			$account_id = array(
 				'account'=>null,
 				'origin'=>$user.'@'.$domain,
