@@ -159,6 +159,7 @@ function ucmd_namespace(&$socket, $cmdline, $id) {
 }
 
 function ucmd_lsub(&$socket, $cmdline, $id) {
+	// should only list subscribed... well, we'll just consider user has subscribed to all
 	$arg = parse_imap_argv(trim(substr($cmdline, 4)));
 	$namespace = $arg[0];
 	$param = $arg[1];
@@ -200,11 +201,38 @@ C OK LIST completed
 	$arg = parse_imap_argv(trim(substr($cmdline, 4)));
 	$reference = $arg[0];
 	$param = $arg[1];
+	// resolve reference...
+	$p = $socket['userinfo']['prefix'];
+	$parent = -1;
 	if ($reference=='') $reference='/';
-	$name = $param;
-	if ( (addslashes($name)!=$name) || (strpos($name, ' ')!==false))
-		$name='"'.addslashes($name).'"';
-	swrite($socket, '* LIST () "'.$reference.'" '.$name);
+	if ($reference!='/') {
+		$reference = explode('/', $reference);
+		foreach($reference as $ref) {
+			if (($parent==-1) && ($ref=='INBOX')) { $parent=0; continue; } // inbox is just a virtual subfolder
+			if ($ref=='') continue;
+			$req = 'SELECT `id` FROM '.$p.'folders` WHERE `account` = \''.mysql_escape_string($socket['userinfo']['userid']).'\' AND ';
+			$req.= '`parent` = \''.mysql_escape_string($parent).'\' AND `name` = \''.mysql_escape_string($ref).'\'';
+			$res = @mysql_query($req);
+			$res = @mysql_fetch_row($res);
+			if (!$res) {
+				swrite($socket, $id.' NO Reference path not found');
+				return;
+			}
+			$parent = $ref[0];
+		}
+	}
+	if (($parent==-1) && ($param='*')) {
+		swrite($socket, '* LIST () "'.$reference.'" INBOX');
+	}
+	$req = 'SELECT `name` FROM '.$p.'folders` WHERE `parent` = \''.mysql_escape_string($parent).'\'';
+	if ($param!='*') $req.=' AND `name` LIKE \''.mysql_escape_string(str_replace('*', '%', $param)).'\'';
+	$res = @mysql_query($req);
+	while($row = mysql_fetch_row($res)) {
+		$name = mb_convert_encoding($row[0], 'UTF-8', 'UTF7-IMAP');
+		if ( (addslashes($name)!=$name) || (strpos($name, ' ')!==false))
+			$name='"'.addslashes($name).'"';
+		swrite($socket, '* LIST () "'.$reference.'" '.$name);
+	}
 	swrite($socket, $id.' OK LIST completed');
 }
 
@@ -281,11 +309,7 @@ function ucmd_logout(&$socket,$cmdline, $id) {
 	exit;
 }
 
-function pcmd_login(&$socket,$cmdline, $id) {
-	$cmdline=explode(' ',$cmdline);
-	$cmd=array_shift($cmdline); // "LOGIN"
-	$login=array_shift($cmdline); // login
-	$pass=implode(' ',$cmdline); // RFC suggests to accept spaces in password :)
+function priv_do_login(&$socket, $id, $login, $pass) {
 	$pos=strrpos($login,'@');
 	if ($pos===false) $pos=strrpos($login,'+');
 	$domain=substr($login,$pos+1);
@@ -361,3 +385,32 @@ function pcmd_login(&$socket,$cmdline, $id) {
 	$socket['namespace']='ucmd';
 	swrite($socket,$id.' OK LOGIN accepted');
 }
+
+
+function pcmd_authenticate(&$socket,$cmdline, $id) {
+	$cmdline=explode(' ',$cmdline);
+	$cmd=array_shift($cmdline); // "AUTHENTICATE"
+	$type=array_shift($cmdline); // "LOGIN"
+
+	if (strtoupper($type)!='LOGIN') {
+		swrite($socket, $id.' NO Bad authenticate method');
+		return;
+	}
+
+	swrite($socket, '+ '.base64_encode('User Name'));
+	$login = base64_decode(sread($socket));
+	if (!$socket["state"]) return;
+	swrite($socket, '+ '.base64_encode('Password'));
+	$pass = base64_decode(sread($socket));
+	if (!$socket["state"]) return;
+	priv_do_login($socket, $id, $login, $pass);
+}
+
+function pcmd_login(&$socket,$cmdline, $id) {
+	$cmdline=explode(' ',$cmdline);
+	$cmd=array_shift($cmdline); // "LOGIN"
+	$login=array_shift($cmdline); // login
+	$pass=implode(' ',$cmdline); // RFC suggests to accept spaces in password :)
+	priv_do_login($socket, $id, $login, $pass);
+}
+
