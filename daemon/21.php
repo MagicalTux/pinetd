@@ -364,10 +364,19 @@ function pcmd_port(&$socket,$cmdline) {
 
 function pcmd_pasv(&$socket,$cmdline) {
 	// passive mode
-	global $pasv_ip;
+	global $pasv_ip, $pasv_base_port, $pasv_max_port;
 	$myip="";
 	list($myip, $myport) = explode(':', stream_socket_get_name($socket["sock"], false));
-	$sock=@stream_socket_server('tcp://'.$myip.':0', $errno, $errstr);
+	while(1) {
+		$sock=@stream_socket_server('tcp://'.$myip.':'.$pasv_base_port, $errno, $errstr);
+		if (!$sock) {
+			$pasv_base_port++;
+			if ($pasv_base_port<1024) $pasv_base_port=1025;
+			if ($pasv_base_port>$pasv_max_port) break;
+		} else {
+			break;
+		}
+	}
 	if (!$sock) {
 		swrite($socket,"500 Couldn't create socket : [".$errno.']: '.$errstr);
 		return false;
